@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getPhotoUrl } from '../data/photos';
-import ExifInfo from './ExifInfo';
 import styles from './HomePage.module.css';
 
 export default function HomePage({ onPhotoClick, isPaused, initialPhotos = [] }) {
@@ -56,7 +55,6 @@ export default function HomePage({ onPhotoClick, isPaused, initialPhotos = [] })
             className={styles.photo}
             style={{ maxWidth: `${currentWidth}vw` }}
           />
-          <ExifInfo photo={currentPhoto} />
         </div>
       </div>
 
