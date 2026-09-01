@@ -23,7 +23,6 @@ export default function PhotoUpload({ open, onClose, onSuccess }) {
       formData.append('file', selectedFile);
       formData.append('title', values.title || '未命名');
       formData.append('date', values.date || '');
-      formData.append('category', values.category || 'landscape');
       formData.append('rotation', values.rotation || 0);
 
       await uploadPhoto(formData);
@@ -82,7 +81,7 @@ export default function PhotoUpload({ open, onClose, onSuccess }) {
       <Form
         form={form}
         layout="vertical"
-        initialValues={{ category: 'landscape', rotation: 0 }}
+        initialValues={{ rotation: 0 }}
         style={{ marginTop: 24 }}
       >
         <Form.Item>
@@ -112,14 +111,6 @@ export default function PhotoUpload({ open, onClose, onSuccess }) {
         <div style={{ display: 'flex', gap: 12 }}>
           <Form.Item name="date" label="日期" style={{ flex: 1 }}>
             <Input type="date" />
-          </Form.Item>
-
-          <Form.Item name="category" label="分类" style={{ flex: 1 }}>
-            <Select>
-              <Select.Option value="landscape">风光</Select.Option>
-              <Select.Option value="portrait">人像</Select.Option>
-              <Select.Option value="street">街拍</Select.Option>
-            </Select>
           </Form.Item>
         </div>
 

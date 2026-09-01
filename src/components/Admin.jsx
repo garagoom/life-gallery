@@ -54,7 +54,6 @@ export default function Admin() {
   const handleSearch = (values) => {
     const params = {};
     if (values.title) params.title = values.title;
-    if (values.category) params.category = values.category;
     if (values.dateRange && values.dateRange[0]) {
       params.dateFrom = values.dateRange[0].format('YYYY-MM-DD');
     }
@@ -95,7 +94,6 @@ export default function Admin() {
     form.setFieldsValue({
       title: record.title,
       date: record.date ? dayjs(record.date) : null,
-      category: record.category,
     });
     setPreview(getPhotoUrl(record));
     setSelectedFile(null);
@@ -146,7 +144,6 @@ export default function Admin() {
         await updatePhoto(editingPhoto.id, {
           title: values.title,
           date: values.date ? values.date.format('YYYY-MM-DD') : null,
-          category: values.category,
         });
         message.success('更新成功');
       } else {
@@ -154,7 +151,6 @@ export default function Admin() {
         formData.append('file', selectedFile);
         formData.append('title', values.title || '未命名');
         formData.append('date', values.date ? values.date.format('YYYY-MM-DD') : '');
-        formData.append('category', values.category || 'landscape');
         await uploadPhoto(formData);
         message.success('上传成功');
       }
@@ -215,16 +211,6 @@ export default function Admin() {
       dataIndex: 'title',
       key: 'title',
       ellipsis: true,
-    },
-    {
-      title: '分类',
-      dataIndex: 'category',
-      key: 'category',
-      width: 80,
-      render: (text) => {
-        const map = { landscape: '风光', portrait: '人像', street: '街拍' };
-        return map[text] || text || '-';
-      },
     },
     {
       title: '日期',
@@ -315,17 +301,6 @@ export default function Admin() {
                 allowClear
               />
             </Form.Item>
-            <Form.Item name="category" style={{ marginBottom: 0 }}>
-              <Select 
-                placeholder="选择分类" 
-                style={{ width: 120 }}
-                allowClear
-              >
-                <Select.Option value="landscape">风光</Select.Option>
-                <Select.Option value="portrait">人像</Select.Option>
-                <Select.Option value="street">街拍</Select.Option>
-              </Select>
-            </Form.Item>
             <Form.Item name="dateRange" style={{ marginBottom: 0 }}>
               <DatePicker.RangePicker style={{ width: 240 }} />
             </Form.Item>
@@ -380,7 +355,7 @@ export default function Admin() {
           <Form
             form={form}
             layout="vertical"
-            initialValues={{ category: 'landscape' }}
+            initialValues={{}}
             style={{ marginTop: 24 }}
           >
             {!editingPhoto && (
@@ -445,14 +420,6 @@ export default function Admin() {
             <div style={{ display: 'flex', gap: 12 }}>
               <Form.Item name="date" label="日期" style={{ flex: 1 }}>
                 <DatePicker style={{ width: '100%' }} placeholder="选择日期" />
-              </Form.Item>
-
-              <Form.Item name="category" label="分类" style={{ flex: 1 }}>
-                <Select>
-                  <Select.Option value="landscape">风光</Select.Option>
-                  <Select.Option value="portrait">人像</Select.Option>
-                  <Select.Option value="street">街拍</Select.Option>
-                </Select>
               </Form.Item>
             </div>
           </Form>
