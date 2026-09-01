@@ -1,0 +1,64 @@
+.modal {
+  position: relative;
+}
+
+.uploadArea {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-bottom: 24px;
+}
+
+.uploadArea:hover {
+  border-color: var(--text-secondary);
+  background: rgba(139, 115, 85, 0.03);
+}
+
+.uploadArea.hasPreview {
+  padding: 0;
+  border-style: solid;
+}
+
+.uploadIcon {
+  font-size: 40px;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  margin-bottom: 12px;
+}
+
+.uploadText {
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.uploadHint {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.preview {
+  width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
+.changeBtn {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 24px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.changeBtn:hover {
+  color: var(--text-primary);
+}

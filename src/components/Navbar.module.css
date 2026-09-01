@@ -1,0 +1,28 @@
+.navbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  padding: 20px 0;
+  background: linear-gradient(transparent, var(--bg-primary) 30%);
+  z-index: 100;
+}
+
+.navLink {
+  font-size: 13px;
+  color: var(--text-secondary);
+  letter-spacing: 2px;
+  transition: color 0.3s;
+  padding: 8px 16px;
+}
+
+.navLink:hover {
+  color: var(--text-primary);
+}
+
+.navLink.active {
+  color: var(--text-primary);
+}

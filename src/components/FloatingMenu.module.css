@@ -1,0 +1,90 @@
+.container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+}
+
+.mainButton {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+.mainButton:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.moduleIcon {
+  font-size: 24px;
+  color: var(--accent);
+}
+
+.popover :global(.ant-popover-inner) {
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.popover :global(.ant-popover-content) {
+  padding: 8px;
+}
+
+.popoverContent {
+  width: 220px;
+}
+
+.section {
+  padding: 4px 0;
+}
+
+.sectionTitle {
+  font-size: 11px !important;
+  padding: 4px 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.menu {
+  border-inline-end: none !important;
+}
+
+.menu :global(.ant-menu-item) {
+  height: 36px;
+  line-height: 36px;
+  border-radius: 6px;
+  margin: 2px 0;
+}
+
+.menu :global(.ant-menu-item:hover) {
+  background: rgba(139, 115, 85, 0.1) !important;
+}
+
+.menu :global(.ant-menu-item-selected) {
+  background: rgba(139, 115, 85, 0.15) !important;
+  color: var(--accent) !important;
+}
+
+.userItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.userItem:hover {
+  background: rgba(139, 115, 85, 0.1);
+}

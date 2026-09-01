@@ -1,0 +1,176 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg-primary: #f5f0e8;
+  --bg-secondary: #ebe5d9;
+  --text-primary: #4a4a4a;
+  --text-secondary: #8b7355;
+  --accent: #8b7355;
+  --border: #d4cdc1;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Playfair Display', serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Antd theme overrides */
+:root {
+  --ant-primary-color: #8b7355;
+  --ant-border-color: #d4cdc1;
+  --ant-text-color: #4a4a4a;
+  --ant-text-color-secondary: #8b7355;
+  --ant-background: #f5f0e8;
+  --ant-background-light: #ebe5d9;
+}
+
+/* Antd component overrides */
+.ant-btn-primary {
+  background: var(--text-primary) !important;
+  border-color: var(--text-primary) !important;
+}
+
+.ant-btn-default {
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+.ant-btn-default:hover {
+  border-color: var(--text-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-select-selector,
+.ant-picker {
+  border-color: var(--border) !important;
+}
+
+.ant-input:focus,
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper-focused,
+.ant-select-focused .ant-select-selector {
+  border-color: var(--text-secondary) !important;
+  box-shadow: 0 0 0 2px rgba(139, 115, 85, 0.1) !important;
+}
+
+.ant-modal-content {
+  background: var(--bg-primary) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+}
+
+.ant-modal-header {
+  background: transparent !important;
+  border-bottom: none !important;
+}
+
+.ant-modal-title {
+  color: var(--text-primary) !important;
+  font-family: 'Playfair Display', serif !important;
+}
+
+.ant-modal-close {
+  color: var(--text-secondary) !important;
+}
+
+.ant-form-item-label > label {
+  color: var(--text-secondary) !important;
+}
+
+.ant-select-item-option-selected {
+  background-color: var(--bg-secondary) !important;
+}
+
+.ant-select-item-option-active {
+  background-color: var(--bg-secondary) !important;
+}
+
+.ant-dropdown-menu {
+  background: var(--bg-primary) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.ant-dropdown-menu-item:hover {
+  background: var(--bg-secondary) !important;
+}
+
+.ant-message-notice-content {
+  background: var(--bg-primary) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.ant-notification-notice {
+  background: var(--bg-primary) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.ant-upload-drag {
+  border-color: var(--border) !important;
+  background: transparent !important;
+}
+
+.ant-upload-drag:hover {
+  border-color: var(--text-secondary) !important;
+}
+
+.ant-slider-rail {
+  background-color: var(--border) !important;
+}
+
+.ant-slider-track {
+  background-color: var(--text-secondary) !important;
+}
+
+.ant-slider-handle::after {
+  border-color: var(--text-primary) !important;
+  box-shadow: 0 0 0 2px var(--bg-primary) !important;
+}
+
+.ant-menu {
+  background: transparent !important;
+}
+
+.ant-menu-item {
+  color: var(--text) !important;
+}
+
+.ant-menu-item:hover {
+  background: rgba(139, 115, 85, 0.1) !important;
+}
+
+.ant-menu-item-selected {
+  background: rgba(139, 115, 85, 0.15) !important;
+  color: var(--accent) !important;
+}
+
+.ant-popover-inner {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+}
+
+.ant-popover-arrow-content {
+  display: none !important;
+}
+
+.ant-badge-dot {
+  background: var(--accent) !important;
+}

@@ -1,0 +1,29 @@
+.masonryGrid {
+  display: flex;
+  margin-left: -16px;
+  width: auto;
+}
+
+.masonryColumn {
+  padding-left: 16px;
+  background-clip: padding-box;
+}
+
+.photoItem {
+  margin-bottom: 16px;
+  cursor: pointer;
+  overflow: hidden;
+  border-radius: 4px;
+  transition: transform 0.3s ease;
+}
+
+.photoItem:hover {
+  transform: scale(1.02);
+}
+
+.photo {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}

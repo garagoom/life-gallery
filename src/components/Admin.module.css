@@ -1,0 +1,79 @@
+.container {
+  padding: 40px 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.searchBar {
+  background: var(--bg-secondary);
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.uploadArea {
+  border: 2px dashed #d4cdc1;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.uploadArea:hover {
+  border-color: #8b7355;
+  background: rgba(139, 115, 85, 0.03);
+}
+
+.uploadArea.dragOver {
+  border-color: #8b7355;
+  background: rgba(139, 115, 85, 0.05);
+}
+
+.batchUploadArea {
+  border: 2px dashed #d4cdc1;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.batchUploadArea:hover {
+  border-color: #8b7355;
+  background: rgba(139, 115, 85, 0.03);
+}
+
+.batchUploadArea.dragOver {
+  border-color: #8b7355;
+  background: rgba(139, 115, 85, 0.05);
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 20px 16px;
+  }
+
+  .title {
+    font-size: 20px;
+  }
+
+  .searchBar {
+    padding: 12px;
+  }
+}
