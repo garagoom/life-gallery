@@ -1,23 +1,38 @@
-# 摄影作品展示网站
+# Life Gallery
 
-一个极简风格的摄影作品展示网站，采用复古淡黄色主题，具有独特的首页随机照片切换和复古相纸灯箱效果。
+个人兴趣爱好展示平台，当前包含摄影模块，后续将扩展更多兴趣模块。
 
 ## 功能特性
 
-- **首页随机展示**：自动随机切换照片，800ms 快速切换，带来抽奖般的随机感
-- **点击暂停**：点击空白区域可暂停/恢复照片切换
+### 摄影模块
+- **首页随机展示**：自动随机切换照片，500ms 快速切换
+- **图片预加载**：Loading 页面预加载所有图片，确保首页无闪烁
 - **复古相纸灯箱**：点击照片弹出复古拍立得风格的大图预览
-- **瀑布流作品集**：使用 Masonry 布局展示所有作品
-- **响应式设计**：完美适配桌面端、平板和手机
-- **键盘导航**：灯箱支持键盘左右切换和 ESC 关闭
+- **瀑布流作品集**：Masonry 布局 + 无限滚动加载
+- **管理后台**：照片上传、编辑、删除（需 editor/admin 角色）
+
+### 用户系统
+- JWT 认证（access token 15min + refresh token 7d）
+- 三角色权限：admin（全权限）、editor（照片管理）、viewer（只读）
+- 用户管理面板（仅 admin）
+
+### 导航
+- 浮动模块切换器（右下角，hover 展开）
+- 支持多模块扩展（摄影、旅行、笔记等）
 
 ## 技术栈
 
-- **构建工具**：Vite
-- **前端框架**：React 18
-- **路由**：React Router
-- **瀑布流**：react-masonry-css
-- **样式**：CSS Modules
+### 前端
+- React 18 + Vite
+- React Router
+- Ant Design (antd)
+- CSS Modules
+
+### 后端
+- Express 5
+- SQLite (sql.js)
+- JWT 认证
+- Sharp 图片处理
 
 ## 快速开始
 
@@ -30,10 +45,17 @@ npm install
 ### 启动开发服务器
 
 ```bash
+# 同时启动前端和后端
 npm run dev
 ```
 
-浏览器访问 http://localhost:5173
+- 前端：http://localhost:5174
+- 后端：http://localhost:3001
+
+### 默认账户
+
+- 用户名：`admin`
+- 密码：`admin123`
 
 ### 构建生产版本
 
@@ -41,63 +63,86 @@ npm run dev
 npm run build
 ```
 
-构建产物将输出到 `dist/` 目录。
-
-### 预览生产版本
+### 启动生产服务器
 
 ```bash
-npm run preview
+npm run server
 ```
 
 ## 项目结构
 
 ```
-show/
-├── public/
-│   └── images/          # 照片资源
+life-gallery/
+├── server/                    # 后端
+│   ├── index.cjs             # Express 入口
+│   ├── db.cjs                # 数据库初始化
+│   ├── middleware/
+│   │   ├── auth.cjs          # JWT 认证中间件
+│   │   └── permission.cjs    # 角色权限中间件
+│   ├── routes/
+│   │   ├── auth.cjs          # 登录/登出/刷新 token
+│   │   ├── photos.cjs        # 照片 CRUD API
+│   │   └── users.cjs         # 用户管理 API
+│   ├── uploads/              # 原图存储（gitignore）
+│   └── thumbnails/           # 缩略图（gitignore）
 ├── src/
-│   ├── components/
-│   │   ├── HomePage.jsx           # 首页：随机照片切换
-│   │   ├── HomePage.module.css
-│   │   ├── Portfolio.jsx          # 作品集页面
-│   │   ├── Portfolio.module.css
-│   │   ├── MasonryGrid.jsx        # 瀑布流组件
-│   │   ├── MasonryGrid.module.css
-│   │   ├── RetroLightbox.jsx      # 复古相纸灯箱
-│   │   ├── RetroLightbox.module.css
-│   │   ├── Navbar.jsx             # 导航栏
-│   │   └── Navbar.module.css
+│   ├── api/                  # API 客户端
+│   │   ├── auth.js
+│   │   ├── photos.js
+│   │   └── users.js
+│   ├── components/           # React 组件
+│   │   ├── HomePage.jsx      # 首页随机轮播
+│   │   ├── Portfolio.jsx     # 作品集（无限滚动）
+│   │   ├── Loading.jsx       # 图片预加载页
+│   │   ├── Login.jsx         # 登录页
+│   │   ├── Admin.jsx         # 照片管理后台
+│   │   ├── UserManage.jsx    # 用户管理
+│   │   ├── FloatingMenu.jsx  # 浮动导航菜单
+│   │   ├── RetroLightbox.jsx # 复古灯箱
+│   │   ├── ProtectedRoute.jsx # 路由守卫
+│   │   └── MasonryGrid.jsx   # 瀑布流
+│   ├── contexts/
+│   │   └── AuthContext.jsx   # 认证状态管理
 │   ├── data/
-│   │   └── photos.js              # 照片数据
-│   ├── App.jsx                    # 主应用
-│   ├── main.jsx                   # 入口文件
-│   └── index.css                  # 全局样式
+│   │   └── photos.js         # 照片数据/工具函数
+│   ├── App.jsx               # 路由配置
+│   ├── main.jsx              # 入口
+│   └── index.css             # 全局样式/主题变量
 ├── index.html
 ├── package.json
-├── vite.config.js
-├── .gitignore
-├── .prettierrc
-└── eslint.config.js
+└── vite.config.js
 ```
 
-## 添加照片
+## API 接口
 
-编辑 `src/data/photos.js` 文件，按照以下格式添加照片：
+### 认证
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| POST | `/api/auth/login` | 登录 | 公开 |
+| POST | `/api/auth/refresh` | 刷新 token | 公开 |
+| POST | `/api/auth/logout` | 登出 | 登录 |
+| GET | `/api/auth/profile` | 获取用户信息 | 登录 |
 
-```javascript
-{
-  id: 7,
-  src: '/images/your-photo.jpg',  // 或使用在线图片 URL
-  title: '照片标题',
-  date: '2024-09-01',
-  category: 'landscape',  // landscape | portrait | street
-  rotation: -2  // 灯箱中的旋转角度（-3 到 3）
-}
-```
+### 照片
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| GET | `/api/photos` | 照片列表 | 公开 |
+| GET | `/api/photos/random` | 随机照片 | 公开 |
+| POST | `/api/photos` | 上传照片 | editor+ |
+| PUT | `/api/photos/:id` | 更新照片 | editor+ |
+| DELETE | `/api/photos/:id` | 删除照片 | editor+ |
 
-## 自定义主题
+### 用户管理
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| GET | `/api/users` | 用户列表 | admin |
+| POST | `/api/users` | 创建用户 | admin |
+| PUT | `/api/users/:id` | 更新用户 | admin |
+| DELETE | `/api/users/:id` | 删除用户 | admin |
 
-编辑 `src/index.css` 中的 CSS 变量来自定义颜色主题：
+## 主题自定义
+
+编辑 `src/index.css` 中的 CSS 变量：
 
 ```css
 :root {
@@ -106,19 +151,10 @@ show/
   --text-primary: #4a4a4a;    /* 主文字颜色 */
   --text-secondary: #8b7355;  /* 次要文字颜色 */
   --accent: #8b7355;          /* 强调色 */
+  --border: #d4cdc1;          /* 边框色 */
 }
 ```
 
-## 开发命令
-
-| 命令 | 说明 |
-|------|------|
-| `npm run dev` | 启动开发服务器 |
-| `npm run build` | 构建生产版本 |
-| `npm run preview` | 预览生产版本 |
-| `npm run lint` | 运行代码检查 |
-| `npm run format` | 格式化代码 |
-
-## 许可证
+## License
 
 MIT
