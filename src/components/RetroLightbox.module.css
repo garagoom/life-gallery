@@ -28,9 +28,7 @@
 }
 
 .card {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
+  position: relative;
   animation: cardPop 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
   max-width: calc(100vw - 120px);
 }
@@ -111,14 +109,21 @@
 }
 
 .meta {
+  position: absolute;
+  bottom: 20px;
+  right: 15px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px 4px;
-  color: rgba(255, 255, 255, 0.7);
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.8);
   font-size: 12px;
   font-family: 'Courier New', monospace;
   white-space: nowrap;
+  pointer-events: none;
 }
 
 .metaLine {
