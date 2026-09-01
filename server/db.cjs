@@ -113,6 +113,82 @@ async function initDb() {
   db.run('CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id)');
   db.run('CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token)');
 
+  // Create roles table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS roles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT UNIQUE NOT NULL,
+      label TEXT NOT NULL,
+      level INTEGER DEFAULT 0,
+      status INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Create menus table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS menus (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      parent_id INTEGER DEFAULT NULL,
+      key TEXT UNIQUE NOT NULL,
+      label TEXT NOT NULL,
+      icon TEXT,
+      path TEXT,
+      sort_order INTEGER DEFAULT 0,
+      status INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (parent_id) REFERENCES menus(id) ON DELETE SET NULL
+    )
+  `);
+
+  // Create role_permissions table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS role_permissions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      role_id INTEGER NOT NULL,
+      menu_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+      FOREIGN KEY (menu_id) REFERENCES menus(id) ON DELETE CASCADE,
+      UNIQUE(role_id, menu_id)
+    )
+  `);
+
+  // Insert default roles
+  db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('admin', '管理员', 3)`);
+  db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('editor', '编辑者', 2)`);
+  db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('viewer', '查看者', 1)`);
+
+  // Insert default menus
+  db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (1, NULL, 'photography', '摄影', 'CameraOutlined', '/photography', 1)`);
+  db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (2, 1, 'home', '首页', 'HomeOutlined', '/photography/home', 1)`);
+  db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (3, 1, 'portfolio', '作品集', 'PictureOutlined', '/photography/portfolio', 2)`);
+  db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (4, 1, 'admin', '照片管理', 'SettingOutlined', '/photography/admin', 3)`);
+  db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (5, NULL, 'system', '系统管理', 'AppstoreOutlined', '/system', 10)`);
+  db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (6, 5, 'users', '用户管理', 'TeamOutlined', '/photography/admin/users', 1)`);
+  db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (7, 5, 'roles', '角色管理', 'SafetyOutlined', '/photography/admin/roles', 2)`);
+  db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (8, 5, 'menus', '菜单管理', 'MenuOutlined', '/photography/admin/menus', 3)`);
+
+  // Assign default permissions
+  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'admin'`);
+  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'editor' AND m.id IN (1, 2, 3, 4)`);
+  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'viewer' AND m.id IN (1, 2, 3)`);
+
+  // Add role_id column to users table
+  try {
+    db.run(`ALTER TABLE users ADD COLUMN role_id INTEGER`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Migrate existing role string to role_id
+  db.run(`UPDATE users SET role_id = (SELECT id FROM roles WHERE roles.name = users.role) WHERE role_id IS NULL`);
+
+  // Ensure admin user has correct role_id
+  db.run(`UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'admin') WHERE username = 'admin' AND role_id IS NULL`);
+
   saveDb();
   return db;
 }
