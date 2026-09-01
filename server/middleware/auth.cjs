@@ -1,7 +1,12 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'photography-portfolio-secret-key';
-const REFRESH_SECRET = process.env.REFRESH_SECRET || 'photography-portfolio-refresh-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
+const REFRESH_SECRET = process.env.REFRESH_SECRET;
+
+if (!JWT_SECRET || !REFRESH_SECRET) {
+  console.error('FATAL: JWT_SECRET and REFRESH_SECRET environment variables are required!');
+  process.exit(1);
+}
 
 // Token expiration times
 const ACCESS_TOKEN_EXPIRES = '15m';  // 15 minutes

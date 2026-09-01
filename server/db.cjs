@@ -90,12 +90,13 @@ async function initDb() {
 
   if (!adminExists) {
     const bcrypt = require('bcryptjs');
-    const hashedPassword = bcrypt.hashSync('admin123', 10);
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    const hashedPassword = bcrypt.hashSync(adminPassword, 10);
     db.run(
       'INSERT INTO users (username, password, display_name, role) VALUES (?, ?, ?, ?)',
       ['admin', hashedPassword, '管理员', 'admin']
     );
-    console.log('Default admin user created: admin / admin123');
+    console.log(`Default admin created: admin / ${adminPassword === 'admin123' ? '(default - CHANGE IN PRODUCTION!)' : '(custom)'}`);
   }
 
   // Create refresh_tokens table
