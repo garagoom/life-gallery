@@ -98,7 +98,7 @@ export default function PhotoUpload({ open, onClose, onSuccess }) {
                   <UploadOutlined />
                 </p>
                 <p style={{ color: '#4a4a4a' }}>点击或拖拽图片到此处上传</p>
-                <p style={{ color: '#8b7355', fontSize: 13 }}>支持 JPEG、PNG、WebP 格式</p>
+                <p style={{ color: '#8b7355', fontSize: 13 }}>支持 JPEG、PNG、WebP、HEIC 格式，上传后自动压缩为 WebP</p>
               </div>
             )}
           </Upload.Dragger>

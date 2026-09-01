@@ -28,11 +28,11 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('仅支持 JPEG、PNG、WebP 格式'), false);
+    cb(new Error('仅支持 JPEG、PNG、WebP、HEIC 格式'), false);
   }
 };
 
@@ -195,16 +195,30 @@ function formatExif(exif) {
 
 // Process and save a single photo file
 async function processPhoto(file, title, date, category) {
-  const filename = file.filename;
-  const thumbnailName = 'thumb-' + filename;
+  // New filename as .webp
+  const baseName = path.parse(file.filename).name;
+  const webpFilename = baseName + '.webp';
+  const webpPath = path.join(uploadsDir, webpFilename);
+  const thumbnailName = 'thumb-' + baseName + '.webp';
   const thumbnailPath = path.join(thumbnailsDir, thumbnailName);
 
+  // Extract EXIF before conversion
   const exif = await extractExif(file.path);
   const formattedExif = formatExif(exif);
 
+  // Convert original to WebP, limit max width to 3840px (4K)
   await sharp(file.path)
+    .resize(3840, null, { withoutEnlargement: true })
+    .webp({ quality: 85 })
+    .toFile(webpPath);
+
+  // Delete original file
+  try { fs.unlinkSync(file.path); } catch (e) { /* ignore */ }
+
+  // Generate thumbnail as WebP, 300px wide
+  await sharp(webpPath)
     .resize(300, null, { withoutEnlargement: true })
-    .jpeg({ quality: 80 })
+    .webp({ quality: 80 })
     .toFile(thumbnailPath);
 
   const rotation = (Math.random() * 6 - 3).toFixed(1);
@@ -213,13 +227,13 @@ async function processPhoto(file, title, date, category) {
   if (!photoDate && formattedExif.dateTime) {
     photoDate = formattedExif.dateTime;
   } else if (!photoDate) {
-    const stats = fs.statSync(file.path);
+    const stats = fs.statSync(webpPath);
     photoDate = stats.mtime.toISOString().split('T')[0];
   }
 
   return {
     title: title || path.parse(file.originalname).name || '未命名',
-    filename,
+    filename: webpFilename,
     thumbnail: thumbnailName,
     date: photoDate,
     category: category || null,
