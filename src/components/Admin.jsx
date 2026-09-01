@@ -4,7 +4,7 @@ import { Table, Button, Modal, Form, Input, Select, Upload, Image, Space, Popcon
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, FolderOpenOutlined, SearchOutlined, ReloadOutlined, TeamOutlined } from '@ant-design/icons';
 import zhCN from 'antd/locale/zh_CN';
 import dayjs from 'dayjs';
-import { getPhotos, uploadPhoto, batchUploadPhotos, updatePhoto, deletePhoto } from '../api/photos';
+import { getPhotos, uploadPhoto, batchUploadPhotos, updatePhoto, deletePhoto, batchDeletePhotos } from '../api/photos';
 import { getPhotoUrl, getThumbnailUrl } from '../data/photos';
 import { useAuth } from '../contexts/AuthContext';
 import styles from './Admin.module.css';
@@ -33,6 +33,7 @@ export default function Admin() {
     totalPages: 0
   });
   const [searchParams, setSearchParams] = useState({});
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
 
   const loadPhotos = async (page = 1, pageSize = 10, search = {}) => {
     setLoading(true);
@@ -109,6 +110,30 @@ export default function Admin() {
     } catch (error) {
       message.error(error.message || '删除失败');
     }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('请先选择要删除的照片');
+      return;
+    }
+    Modal.confirm({
+      title: '确定删除选中的照片？',
+      content: `将删除 ${selectedRowKeys.length} 张照片，此操作不可撤销`,
+      okText: '确定删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await batchDeletePhotos(selectedRowKeys);
+          message.success(`成功删除 ${selectedRowKeys.length} 张照片`);
+          setSelectedRowKeys([]);
+          loadPhotos(pagination.page, pagination.pageSize, searchParams);
+        } catch (error) {
+          message.error(error.message || '批量删除失败');
+        }
+      },
+    });
   };
 
   const handleFileSelect = (file) => {
@@ -277,6 +302,19 @@ export default function Admin() {
                 用户管理
               </Button>
             )}
+            {selectedRowKeys.length > 0 && (
+              <Popconfirm
+                title={`确定删除选中的 ${selectedRowKeys.length} 张照片？`}
+                onConfirm={handleBatchDelete}
+                okText="确定"
+                cancelText="取消"
+                okType="danger"
+              >
+                <Button danger icon={<DeleteOutlined />}>
+                  批量删除 ({selectedRowKeys.length})
+                </Button>
+              </Popconfirm>
+            )}
             <Button icon={<FolderOpenOutlined />} onClick={handleBatchUpload}>
               批量上传
             </Button>
@@ -322,6 +360,10 @@ export default function Admin() {
           dataSource={photos}
           rowKey="id"
           loading={loading}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: setSelectedRowKeys,
+          }}
           pagination={{
             current: pagination.page,
             pageSize: pagination.pageSize,

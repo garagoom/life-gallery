@@ -121,3 +121,12 @@ export async function batchUploadPhotos(formData) {
   });
   return result;
 }
+
+export async function batchDeletePhotos(ids) {
+  const result = await request(`${API_BASE}/photos/batch-delete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids })
+  });
+  return result;
+}

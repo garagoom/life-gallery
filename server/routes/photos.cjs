@@ -542,4 +542,38 @@ router.delete('/:id', authMiddleware, requireEditor, (req, res) => {
   }
 });
 
+// DELETE /api/photos/batch - Batch delete
+router.post('/batch-delete', authMiddleware, requireEditor, (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return error(res, '请选择要删除的照片', 400);
+    }
+
+    const db = getDb();
+    let deletedCount = 0;
+
+    for (const id of ids) {
+      const stmt = db.prepare('SELECT * FROM photos WHERE id = ?');
+      stmt.bind([parseInt(id)]);
+      if (stmt.step()) {
+        const photo = stmt.getAsObject();
+        const uploadPath = path.join(uploadsDir, photo.filename);
+        const thumbPath = path.join(thumbnailsDir, photo.thumbnail);
+        try { if (fs.existsSync(uploadPath)) fs.unlinkSync(uploadPath); } catch (e) {}
+        try { if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath); } catch (e) {}
+        db.run('DELETE FROM photos WHERE id = ?', [parseInt(id)]);
+        deletedCount++;
+      }
+      stmt.free();
+    }
+
+    saveDb();
+    success(res, { deletedCount }, `成功删除 ${deletedCount} 张照片`);
+  } catch (err) {
+    console.error('Batch delete error:', err);
+    error(res, '批量删除失败: ' + err.message);
+  }
+});
+
 module.exports = router;
