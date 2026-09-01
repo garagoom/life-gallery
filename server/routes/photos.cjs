@@ -207,7 +207,9 @@ async function processPhoto(file, title, date, category) {
   const formattedExif = formatExif(exif);
 
   // Convert original to WebP, limit max width to 3840px (4K)
+  // rotate() without args auto-rotates based on EXIF orientation
   await sharp(file.path)
+    .rotate()
     .resize(3840, null, { withoutEnlargement: true })
     .webp({ quality: 85 })
     .toFile(webpPath);
@@ -217,6 +219,7 @@ async function processPhoto(file, title, date, category) {
 
   // Generate thumbnail as WebP, 300px wide
   await sharp(webpPath)
+    .rotate()
     .resize(300, null, { withoutEnlargement: true })
     .webp({ quality: 80 })
     .toFile(thumbnailPath);

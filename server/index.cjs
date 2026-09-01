@@ -31,9 +31,16 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '10mb' }));
 
-// Static files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/thumbnails', express.static(path.join(__dirname, 'thumbnails')));
+// Static files - 上传的图片缓存30天
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  maxAge: '30d',
+  immutable: true,
+}));
+// 缩略图缓存30天
+app.use('/thumbnails', express.static(path.join(__dirname, 'thumbnails'), {
+  maxAge: '30d',
+  immutable: true,
+}));
 
 // API routes
 app.use('/api/photos', photosRouter);
