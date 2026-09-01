@@ -63,7 +63,7 @@ export default function RetroLightbox({ photo, photos, onClose, onNavigate }) {
               <ExifInfo photo={photo} />
             </div>
             
-            {(photo.uploaded_by || photo.created_at) && (
+            {(photo.uploaded_by || photo.date) && (
               <div className={styles.meta}>
                 {photo.uploaded_by && (
                   <div className={styles.metaLine}>
@@ -71,10 +71,10 @@ export default function RetroLightbox({ photo, photos, onClose, onNavigate }) {
                     <span>{photo.uploaded_by}</span>
                   </div>
                 )}
-                {photo.created_at && (
+                {photo.date && (
                   <div className={styles.metaLine}>
                     <ClockCircleOutlined className={styles.metaIcon} />
-                    <span>{formatTime(photo.created_at)}</span>
+                    <span>{formatTime(photo.date)}</span>
                   </div>
                 )}
               </div>
