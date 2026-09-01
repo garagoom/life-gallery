@@ -9,11 +9,6 @@
 - 瀑布流作品集 + 无限滚动
 - 管理后台：照片上传、编辑、删除
 
-## 用户系统
-
-- JWT 认证（access token + refresh token）
-- 三角色权限：admin、editor、viewer
-
 ## 快速开始
 
 ```bash
@@ -23,7 +18,6 @@ npm run dev
 
 - 前端：http://localhost:5174
 - 后端：http://localhost:3001
-- 默认账户：`admin` / `admin123`
 
 ## Tech
 
