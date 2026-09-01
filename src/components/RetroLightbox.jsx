@@ -62,24 +62,24 @@ export default function RetroLightbox({ photo, photos, onClose, onNavigate }) {
               />
               <ExifInfo photo={photo} />
             </div>
-            
-            {(photo.uploaded_by || photo.date) && (
-              <div className={styles.meta}>
-                {photo.uploaded_by && (
-                  <div className={styles.metaLine}>
-                    <UserOutlined className={styles.metaIcon} />
-                    <span>{photo.uploaded_by}</span>
-                  </div>
-                )}
-                {photo.date && (
-                  <div className={styles.metaLine}>
-                    <ClockCircleOutlined className={styles.metaIcon} />
-                    <span>{formatTime(photo.date)}</span>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
+          
+          {(photo.uploaded_by || photo.date) && (
+            <div className={styles.meta}>
+              {photo.uploaded_by && (
+                <div className={styles.metaLine}>
+                  <UserOutlined className={styles.metaIcon} />
+                  <span>{photo.uploaded_by}</span>
+                </div>
+              )}
+              {photo.date && (
+                <div className={styles.metaLine}>
+                  <ClockCircleOutlined className={styles.metaIcon} />
+                  <span>{formatTime(photo.date)}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         
         <button 
