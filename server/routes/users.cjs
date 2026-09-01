@@ -34,8 +34,16 @@ router.post('/', (req, res) => {
       return res.status(400).json({ code: 400, message: '用户名和密码不能为空', data: null });
     }
     
-    if (password.length < 6) {
-      return res.status(400).json({ code: 400, message: '密码至少6位', data: null });
+    if (username.length < 3 || username.length > 20) {
+      return res.status(400).json({ code: 400, message: '用户名长度需在3-20个字符之间', data: null });
+    }
+
+    if (!/^[a-zA-Z0-9]+$/.test(username)) {
+      return res.status(400).json({ code: 400, message: '用户名只允许英文和数字', data: null });
+    }
+    
+    if (password.length < 8 || password.length > 20) {
+      return res.status(400).json({ code: 400, message: '密码长度需在8-20个字符之间', data: null });
     }
     
     if (!['admin', 'editor', 'viewer'].includes(role)) {

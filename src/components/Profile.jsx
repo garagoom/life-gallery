@@ -106,10 +106,17 @@ export default function Profile() {
       label: '修改密码',
       children: (
         <Form form={passwordForm} onFinish={handleChangePassword} layout="vertical" style={{ maxWidth: 400 }}>
-          <Form.Item name="oldPassword" label="原密码" rules={[{ required: true, message: '请输入原密码' }]}>
+          <Form.Item name="oldPassword" label="原密码" rules={[
+            { required: true, message: '请输入原密码' },
+            { min: 8, message: '密码至少8位' },
+          ]}>
             <Input.Password prefix={<LockOutlined />} placeholder="输入原密码" />
           </Form.Item>
-          <Form.Item name="newPassword" label="新密码" rules={[{ required: true, message: '请输入新密码' }, { min: 6, message: '至少6位' }]}>
+          <Form.Item name="newPassword" label="新密码" rules={[
+            { required: true, message: '请输入新密码' },
+            { min: 8, message: '密码至少8位' },
+            { max: 20, message: '密码最多20位' },
+          ]}>
             <Input.Password prefix={<LockOutlined />} placeholder="输入新密码" />
           </Form.Item>
           <Form.Item name="confirmPassword" label="确认密码" dependencies={['newPassword']} rules={[

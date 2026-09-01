@@ -259,8 +259,8 @@ router.put('/password', authMiddleware, (req, res) => {
       return res.status(400).json({ code: 400, message: '请输入原密码和新密码', data: null });
     }
     
-    if (newPassword.length < 6) {
-      return res.status(400).json({ code: 400, message: '新密码至少6位', data: null });
+    if (newPassword.length < 8 || newPassword.length > 20) {
+      return res.status(400).json({ code: 400, message: '新密码长度需在8-20个字符之间', data: null });
     }
     
     const db = getDb();

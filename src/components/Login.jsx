@@ -38,7 +38,12 @@ export default function Login() {
         <Form onFinish={handleSubmit} size="large">
           <Form.Item 
             name="username" 
-            rules={[{ required: true, message: '请输入用户名' }]}
+            rules={[
+              { required: true, message: '请输入用户名' },
+              { min: 3, message: '用户名至少3个字符' },
+              { max: 20, message: '用户名最多20个字符' },
+              { pattern: /^[a-zA-Z0-9]+$/, message: '只允许英文和数字' },
+            ]}
           >
             <Input 
               prefix={<UserOutlined />} 

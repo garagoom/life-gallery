@@ -40,7 +40,12 @@ export default function Register() {
           <p className={styles.subtitle}>创建新账号</p>
         </div>
         <Form form={form} onFinish={handleSubmit} size="large">
-          <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>
+          <Form.Item name="username" rules={[
+            { required: true, message: '请输入用户名' },
+            { min: 3, message: '用户名至少3个字符' },
+            { max: 20, message: '用户名最多20个字符' },
+            { pattern: /^[a-zA-Z0-9]+$/, message: '只允许英文和数字' },
+          ]}>
             <Input prefix={<UserOutlined />} placeholder="用户名" autoComplete="username" />
           </Form.Item>
           <Form.Item name="displayName">
@@ -49,7 +54,11 @@ export default function Register() {
           <Form.Item name="email">
             <Input prefix={<MailOutlined />} placeholder="邮箱（选填）" />
           </Form.Item>
-          <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }, { min: 6, message: '至少6位' }]}>
+          <Form.Item name="password" rules={[
+            { required: true, message: '请输入密码' },
+            { min: 8, message: '密码至少8位' },
+            { max: 20, message: '密码最多20位' },
+          ]}>
             <Input.Password prefix={<LockOutlined />} placeholder="密码" autoComplete="new-password" />
           </Form.Item>
           <Form.Item>

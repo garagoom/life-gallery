@@ -10,6 +10,18 @@ router.post('/register', (req, res) => {
       return res.status(400).json({ code: 400, message: '用户名和密码不能为空' });
     }
 
+    if (username.length < 3 || username.length > 20) {
+      return res.status(400).json({ code: 400, message: '用户名长度需在3-20个字符之间' });
+    }
+
+    if (!/^[a-zA-Z0-9]+$/.test(username)) {
+      return res.status(400).json({ code: 400, message: '用户名只允许英文和数字' });
+    }
+
+    if (password.length < 8 || password.length > 20) {
+      return res.status(400).json({ code: 400, message: '密码长度需在8-20个字符之间' });
+    }
+
     const db = getDb();
 
     const existing = db.exec(`SELECT id FROM users WHERE username = ?`, [username])[0];

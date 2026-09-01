@@ -22,6 +22,7 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.error('Token refresh failed:', error);
       setUser(null);
+      window.location.href = '/login';
     }
   }, []);
 

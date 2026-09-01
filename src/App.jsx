@@ -81,9 +81,11 @@ function App() {
             )
           } />
           <Route path="/photography/portfolio" element={
-            <div style={{ height: '100%', overflow: 'auto', paddingBottom: '80px' }}>
-              <Portfolio onPhotoClick={handlePhotoClick} />
-            </div>
+            <ProtectedRoute>
+              <div style={{ height: '100%', overflow: 'auto', paddingBottom: '80px' }}>
+                <Portfolio onPhotoClick={handlePhotoClick} />
+              </div>
+            </ProtectedRoute>
           } />
           <Route path="/photography/admin" element={
             <ProtectedRoute requiredRole="editor">

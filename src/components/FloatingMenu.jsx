@@ -49,6 +49,11 @@ export default function FloatingMenu() {
   const location = useLocation();
   const { user, loginUser, hasRole } = useAuth();
 
+  if (!user) {
+    navigate('/login', { replace: true });
+    return null;
+  }
+
   const getCurrentModule = () => {
     const path = location.pathname;
     // Check system module first (more specific path)
