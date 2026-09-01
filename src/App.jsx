@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import FloatingMenu from './components/FloatingMenu';
 import HomePage from './components/HomePage';
 import Portfolio from './components/Portfolio';
@@ -7,10 +7,22 @@ import RetroLightbox from './components/RetroLightbox';
 import Admin from './components/Admin';
 import Loading from './components/Loading';
 import Login from './components/Login';
+import Register from './components/Register';
 import ProtectedRoute from './components/ProtectedRoute';
 import UserManage from './components/UserManage';
+import RoleManage from './components/RoleManage';
+import MenuManage from './components/MenuManage';
+import Profile from './components/Profile';
 import { fallbackPhotos } from './data/photos';
 import { getRandomPhotos } from './api/photos';
+
+const hideMenuPaths = ['/login', '/register', '/loading'];
+
+function FloatingMenuWrapper() {
+  const { pathname } = useLocation();
+  if (hideMenuPaths.some(p => pathname.startsWith(p))) return null;
+  return <FloatingMenu />;
+}
 
 function App() {
   const [lightboxPhoto, setLightboxPhoto] = useState(null);
@@ -52,6 +64,7 @@ function App() {
       <div style={{ height: '100%' }}>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           <Route path="/loading" element={<Loading onPhotosLoaded={handlePhotosLoaded} />} />
 
           <Route path="/photography/home" element={
@@ -86,13 +99,34 @@ function App() {
               </div>
             </ProtectedRoute>
           } />
+          <Route path="/photography/admin/roles" element={
+            <ProtectedRoute requiredRole="admin">
+              <div style={{ height: '100%', overflow: 'auto', paddingBottom: '80px' }}>
+                <RoleManage />
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/photography/admin/menus" element={
+            <ProtectedRoute requiredRole="admin">
+              <div style={{ height: '100%', overflow: 'auto', paddingBottom: '80px' }}>
+                <MenuManage />
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/photography/profile" element={
+            <ProtectedRoute>
+              <div style={{ height: '100%', overflow: 'auto', paddingBottom: '80px' }}>
+                <Profile />
+              </div>
+            </ProtectedRoute>
+          } />
 
           <Route path="/" element={<Navigate to="/loading" replace />} />
           <Route path="/photography" element={<Navigate to="/loading" replace />} />
           <Route path="*" element={<Navigate to="/loading" replace />} />
         </Routes>
 
-        <FloatingMenu />
+        <FloatingMenuWrapper />
 
         {lightboxPhoto && (
           <RetroLightbox

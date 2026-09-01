@@ -113,22 +113,27 @@ export default function UserManage() {
       title: '用户名',
       dataIndex: 'username',
       key: 'username',
+      ellipsis: true,
     },
     {
       title: '显示名称',
       dataIndex: 'display_name',
       key: 'display_name',
+      ellipsis: true,
     },
     {
       title: '邮箱',
       dataIndex: 'email',
       key: 'email',
+      ellipsis: true,
       render: (text) => text || '-',
     },
     {
       title: '角色',
       dataIndex: 'role',
       key: 'role',
+      width: 100,
+      align: 'center',
       render: (role) => (
         <Tag color={roleColors[role]}>{roleLabels[role]}</Tag>
       ),
@@ -137,6 +142,8 @@ export default function UserManage() {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
+      width: 100,
+      align: 'center',
       render: (status, record) => (
         <Switch
           checked={status === 1}
@@ -150,12 +157,15 @@ export default function UserManage() {
     {
       title: '操作',
       key: 'action',
-      width: 120,
+      width: 100,
+      fixed: 'right',
+      align: 'center',
       render: (_, record) => (
-        <Space>
+        <Space size="small">
           <Button
             type="link"
-            icon={<EditOutlined />}
+            size="small"
+            icon={<EditOutlined style={{ color: 'var(--accent)' }} />}
             onClick={() => handleEdit(record)}
           />
           {record.id !== currentUser?.id && (
@@ -165,7 +175,7 @@ export default function UserManage() {
               okText="确定"
               cancelText="取消"
             >
-              <Button type="link" danger icon={<DeleteOutlined />} />
+              <Button type="link" size="small" danger icon={<DeleteOutlined />} />
             </Popconfirm>
           )}
         </Space>
@@ -188,6 +198,7 @@ export default function UserManage() {
         rowKey="id"
         loading={loading}
         pagination={false}
+        scroll={{ x: 800 }}
       />
 
       <Modal

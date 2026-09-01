@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Form, Input, Button, message } from 'antd';
+import { useNavigate, Link } from 'react-router-dom';
+import { Form, Input, Button, message, Typography } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { login } from '../api/auth';
 import { useAuth } from '../contexts/AuthContext';
 import styles from './Login.module.css';
+
+const { Text } = Typography;
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
@@ -66,6 +68,9 @@ export default function Login() {
               登录
             </Button>
           </Form.Item>
+          <div style={{ textAlign: 'center' }}>
+            <Text type="secondary">没有账号？</Text> <Link to="/register">去注册</Link>
+          </div>
         </Form>
       </div>
     </div>

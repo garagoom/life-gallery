@@ -5,6 +5,9 @@ const { initDb } = require('./db.cjs');
 const photosRouter = require('./routes/photos.cjs');
 const authRouter = require('./routes/auth.cjs');
 const usersRouter = require('./routes/users.cjs');
+const rolesRouter = require('./routes/roles.cjs');
+const menusRouter = require('./routes/menus.cjs');
+const registerRouter = require('./routes/register.cjs');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -21,6 +24,9 @@ app.use('/thumbnails', express.static(path.join(__dirname, 'thumbnails')));
 app.use('/api/photos', photosRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/roles', rolesRouter);
+app.use('/api/menus', menusRouter);
+app.use('/api', registerRouter);
 
 // Serve frontend in production
 if (process.env.NODE_ENV === 'production') {

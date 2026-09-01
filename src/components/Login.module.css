@@ -5,6 +5,18 @@
   align-items: center;
   justify-content: center;
   background: var(--bg-primary);
+  background-image: url('/images/login-bg.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+}
+
+.container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(245, 240, 232, 0.85);
 }
 
 .card {
@@ -14,6 +26,8 @@
   background: var(--bg-secondary);
   border-radius: 12px;
   border: 1px solid var(--border);
+  position: relative;
+  z-index: 1;
 }
 
 .header {

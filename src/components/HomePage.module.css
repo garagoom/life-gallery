@@ -32,6 +32,12 @@
   overflow: hidden;
 }
 
+.photoWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 .photo {
   max-height: 65vh;
   object-fit: contain;

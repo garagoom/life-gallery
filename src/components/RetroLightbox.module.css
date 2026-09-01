@@ -50,7 +50,7 @@
 
 .photoFrame {
   background: var(--bg-primary);
-  padding: 15px 15px 50px 15px;
+  padding: 15px 15px 10px 15px;
   border-radius: 2px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
   position: relative;
@@ -63,15 +63,6 @@
   max-width: 70vw;
   max-height: 70vh;
   object-fit: contain;
-}
-
-.dateStamp {
-  position: absolute;
-  bottom: 15px;
-  right: 20px;
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  color: var(--accent);
 }
 
 .navButton {

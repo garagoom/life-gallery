@@ -1,0 +1,29 @@
+.container {
+  padding: 6px 0 0;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  opacity: 0.8;
+  line-height: 1.7;
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  letter-spacing: 0.5px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  color: var(--accent);
+}
+
+.defaultIcon {
+  font-size: 12px;
+}
+
+.model {
+  font-weight: 500;
+}

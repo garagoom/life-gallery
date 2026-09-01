@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react';
 import { getPhotoUrl } from '../data/photos';
+import ExifInfo from './ExifInfo';
 import styles from './RetroLightbox.module.css';
 
 export default function RetroLightbox({ photo, photos, onClose, onNavigate }) {
@@ -26,11 +27,6 @@ export default function RetroLightbox({ photo, photos, onClose, onNavigate }) {
     }
   };
 
-  const formatDate = (dateStr) => {
-    const date = new Date(dateStr);
-    return date.toISOString().split('T')[0].replace(/-/g, '.');
-  };
-
   return (
     <div className={styles.overlay} onClick={handleBackdropClick}>
       <div className={styles.container}>
@@ -52,9 +48,7 @@ export default function RetroLightbox({ photo, photos, onClose, onNavigate }) {
               alt={photo.title}
               className={styles.image}
             />
-            <div className={styles.dateStamp}>
-              {formatDate(photo.date)}
-            </div>
+            <ExifInfo photo={photo} />
           </div>
         </div>
         

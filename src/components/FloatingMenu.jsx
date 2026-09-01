@@ -7,7 +7,10 @@ import {
   SettingOutlined,
   HomeOutlined,
   TeamOutlined,
-  PictureOutlined
+  PictureOutlined,
+  SafetyOutlined,
+  MenuOutlined,
+  AppstoreOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { logout } from '../api/auth';
@@ -27,6 +30,18 @@ const modules = [
       { key: 'admin', label: '管理', path: '/photography/admin', icon: <SettingOutlined />, requiredRole: 'editor' },
     ]
   },
+  {
+    key: 'system',
+    label: '系统管理',
+    icon: <AppstoreOutlined />,
+    prefix: '/photography/admin/users',
+    requiredRole: 'admin',
+    children: [
+      { key: 'users', label: '用户管理', path: '/photography/admin/users', icon: <TeamOutlined /> },
+      { key: 'roles', label: '角色管理', path: '/photography/admin/roles', icon: <SafetyOutlined /> },
+      { key: 'menus', label: '菜单管理', path: '/photography/admin/menus', icon: <MenuOutlined /> },
+    ]
+  },
 ];
 
 export default function FloatingMenu() {
@@ -36,8 +51,15 @@ export default function FloatingMenu() {
 
   const getCurrentModule = () => {
     const path = location.pathname;
+    // Check system module first (more specific path)
+    if (path.startsWith('/photography/admin/users') || 
+        path.startsWith('/photography/admin/roles') || 
+        path.startsWith('/photography/admin/menus')) {
+      return modules.find(m => m.key === 'system');
+    }
+    // Then check other modules
     for (const mod of modules) {
-      if (path.startsWith(mod.prefix)) {
+      if (path.startsWith(mod.prefix) && mod.key !== 'system') {
         return mod;
       }
     }
@@ -65,12 +87,14 @@ export default function FloatingMenu() {
     loginUser(null);
   };
 
-  const moduleMenuItems = modules.map(mod => ({
-    key: mod.key,
-    icon: mod.icon,
-    label: mod.label,
-    onClick: () => navigate(mod.prefix + '/home'),
-  }));
+  const moduleMenuItems = modules
+    .filter(mod => !mod.requiredRole || hasRole(mod.requiredRole))
+    .map(mod => ({
+      key: mod.key,
+      icon: mod.icon,
+      label: mod.label,
+      onClick: () => navigate(mod.key === 'system' ? '/photography/admin/users' : mod.prefix + '/home'),
+    }));
 
   const pageMenuItems = currentModule.children
     .filter(child => !child.requiredRole || hasRole(child.requiredRole))
@@ -86,12 +110,7 @@ export default function FloatingMenu() {
       key: 'profile',
       icon: <UserOutlined />,
       label: '个人信息',
-    },
-    hasRole('admin') && {
-      key: 'users',
-      icon: <TeamOutlined />,
-      label: '用户管理',
-      onClick: () => navigate('/photography/admin/users'),
+      onClick: () => navigate('/photography/profile'),
     },
     { type: 'divider' },
     {

@@ -233,6 +233,24 @@ router.get('/profile', authMiddleware, (req, res) => {
   }
 });
 
+router.put('/profile', authMiddleware, (req, res) => {
+  try {
+    const { displayName, email } = req.body;
+    const db = getDb();
+    
+    db.run(
+      'UPDATE users SET display_name = ?, email = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [displayName || null, email || null, req.user.id]
+    );
+    saveDb();
+    
+    res.json({ code: 200, message: '个人信息更新成功', data: null });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ code: 500, message: '更新个人信息失败', data: null });
+  }
+});
+
 router.put('/password', authMiddleware, (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getPhotoUrl } from '../data/photos';
+import ExifInfo from './ExifInfo';
 import styles from './HomePage.module.css';
 
 export default function HomePage({ onPhotoClick, isPaused, initialPhotos = [] }) {
@@ -47,13 +48,16 @@ export default function HomePage({ onPhotoClick, isPaused, initialPhotos = [] })
       </div>
 
       <div className={styles.photoContainer}>
-        <img
-          key={currentPhoto.id}
-          src={getPhotoUrl(currentPhoto)}
-          alt={currentPhoto.title}
-          className={styles.photo}
-          style={{ maxWidth: `${currentWidth}vw` }}
-        />
+        <div className={styles.photoWrapper}>
+          <img
+            key={currentPhoto.id}
+            src={getPhotoUrl(currentPhoto)}
+            alt={currentPhoto.title}
+            className={styles.photo}
+            style={{ maxWidth: `${currentWidth}vw` }}
+          />
+          <ExifInfo photo={currentPhoto} />
+        </div>
       </div>
 
       <div className={styles.hint}>
