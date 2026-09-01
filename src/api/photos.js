@@ -1,13 +1,59 @@
 const API_BASE = '/api';
+const ACCESS_TOKEN_KEY = 'accessToken';
+const REFRESH_TOKEN_KEY = 'refreshToken';
+
+let isRefreshing = false;
 
 async function request(url, options = {}) {
-  const res = await fetch(url, options);
-  const json = await res.json();
-  
-  if (json.code >= 400) {
-    throw new Error(json.message || '请求失败');
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const headers = { ...options.headers };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
-  
+
+  const res = await fetch(url, { ...options, headers });
+  const json = await res.json();
+
+  if (json.code === 401 && json.expired && !isRefreshing) {
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    if (refreshToken) {
+      isRefreshing = true;
+      try {
+        const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken })
+        });
+        const refreshJson = await refreshRes.json();
+        if (refreshJson.code === 200) {
+          localStorage.setItem(ACCESS_TOKEN_KEY, refreshJson.data.accessToken);
+          localStorage.setItem(REFRESH_TOKEN_KEY, refreshJson.data.refreshToken);
+          headers['Authorization'] = `Bearer ${refreshJson.data.accessToken}`;
+          const retryRes = await fetch(url, { ...options, headers });
+          isRefreshing = false;
+          return await retryRes.json();
+        }
+      } catch (e) { /* fall through */ }
+      isRefreshing = false;
+    }
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    window.location.href = '/login';
+    throw new Error(json.message);
+  }
+
+  if (json.code === 401) {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    window.location.href = '/login';
+    throw new Error(json.message);
+  }
+
+  if (json.code >= 400) {
+    throw new Error(json.message);
+  }
+
   return json;
 }
 
