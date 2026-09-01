@@ -57,6 +57,7 @@ async function initDb() {
   addColumnIfNotExists('f_number', 'TEXT');
   addColumnIfNotExists('iso', 'TEXT');
   addColumnIfNotExists('focal_length', 'TEXT');
+  addColumnIfNotExists('uploaded_by', 'TEXT');
   addColumnIfNotExists('software', 'TEXT');
   addColumnIfNotExists('lens_model', 'TEXT');
   addColumnIfNotExists('white_balance', 'TEXT');

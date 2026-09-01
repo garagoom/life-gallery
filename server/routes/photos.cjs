@@ -366,20 +366,21 @@ router.post('/', authMiddleware, requireEditor, upload.single('file'), async (re
 
     const { title, date, category } = req.body;
     const photoData = await processPhoto(req.file, title, date, category);
+    const uploadedBy = req.user ? req.user.username : null;
 
     const db = getDb();
     db.run(
       `INSERT INTO photos (title, filename, thumbnail, date, category, rotation, 
        camera_make, camera_model, exposure_time, f_number, iso, focal_length,
-       software, lens_model, white_balance, metering_mode, flash, color_space) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       software, lens_model, white_balance, metering_mode, flash, color_space, uploaded_by) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         photoData.title, photoData.filename, photoData.thumbnail,
         photoData.date, photoData.category, photoData.rotation,
         photoData.cameraMake, photoData.cameraModel, photoData.exposureTime,
         photoData.fNumber, photoData.iso, photoData.focalLength,
         photoData.software, photoData.lensModel, photoData.whiteBalance,
-        photoData.meteringMode, photoData.flash, photoData.colorSpace
+        photoData.meteringMode, photoData.flash, photoData.colorSpace, uploadedBy
       ]
     );
     saveDb();
@@ -408,6 +409,7 @@ router.post('/batch', authMiddleware, requireEditor, upload.array('files', 100),
     const results = [];
     let successCount = 0;
     let failCount = 0;
+    const uploadedBy = req.user ? req.user.username : null;
 
     for (const file of req.files) {
       try {
@@ -416,15 +418,15 @@ router.post('/batch', authMiddleware, requireEditor, upload.array('files', 100),
         db.run(
           `INSERT INTO photos (title, filename, thumbnail, date, category, rotation,
            camera_make, camera_model, exposure_time, f_number, iso, focal_length,
-           software, lens_model, white_balance, metering_mode, flash, color_space)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           software, lens_model, white_balance, metering_mode, flash, color_space, uploaded_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             photoData.title, photoData.filename, photoData.thumbnail,
             photoData.date, photoData.category, photoData.rotation,
             photoData.cameraMake, photoData.cameraModel, photoData.exposureTime,
             photoData.fNumber, photoData.iso, photoData.focalLength,
             photoData.software, photoData.lensModel, photoData.whiteBalance,
-            photoData.meteringMode, photoData.flash, photoData.colorSpace
+            photoData.meteringMode, photoData.flash, photoData.colorSpace, uploadedBy
           ]
         );
 

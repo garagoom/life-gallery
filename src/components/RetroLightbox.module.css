@@ -24,7 +24,10 @@
   gap: 20px;
 }
 
-.cardWrapper {
+.card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
   animation: cardPop 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
@@ -102,6 +105,28 @@
   letter-spacing: 1px;
 }
 
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 4px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+  white-space: nowrap;
+}
+
+.metaLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.metaIcon {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
 @media (max-width: 768px) {
   .photoFrame {
     padding: 10px 10px 40px 10px;
@@ -123,5 +148,9 @@
   
   .next {
     right: 10px;
+  }
+
+  .meta {
+    display: none;
   }
 }
