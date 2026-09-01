@@ -7,6 +7,7 @@
   line-height: 1.7;
   animation: fadeIn 0.8s ease-in forwards;
   animation-delay: 0.5s;
+  overflow: hidden;
 }
 
 @keyframes fadeIn {
@@ -25,12 +26,14 @@
   align-items: center;
   gap: 5px;
   letter-spacing: 0.5px;
+  overflow: hidden;
 }
 
 .brand {
   display: flex;
   align-items: center;
   color: var(--accent);
+  flex-shrink: 0;
 }
 
 .defaultIcon {
@@ -39,4 +42,7 @@
 
 .model {
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

@@ -49,7 +49,9 @@ export default function ExifInfo({ photo }) {
         </div>
       )}
       <div className={styles.line}>
-        {[exposure, fNumber, iso, focal].filter(Boolean).join('  ')}
+        <span className={styles.model}>
+          {[exposure, fNumber, iso, focal].filter(Boolean).join('  ')}
+        </span>
       </div>
     </div>
   );
