@@ -48,35 +48,26 @@
 .overlayInfo {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-
-.author {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 13px;
-  font-weight: 500;
 }
 
 .cameraLine {
   display: flex;
   align-items: center;
-  gap: 6px;
-}
-
-.brandLogo {
-  display: flex;
-  align-items: center;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.brandLogo img {
-  height: 12px;
-  width: auto;
-  filter: brightness(0) invert(1);
-  opacity: 0.8;
+  justify-content: space-between;
 }
 
 .cameraModel {
   color: rgba(255, 255, 255, 0.6);
   font-size: 11px;
+}
+
+.brandLogo {
+  display: flex;
+  align-items: center;
+}
+
+.author {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  font-weight: 500;
 }

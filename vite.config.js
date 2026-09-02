@@ -3,6 +3,13 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    proxy: {
+      '/api': 'http://localhost:3001',
+      '/uploads': 'http://localhost:3001',
+      '/thumbnails': 'http://localhost:3001',
+    },
+  },
   test: {
     globals: true,
     environment: 'happy-dom',

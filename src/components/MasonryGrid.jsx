@@ -38,8 +38,9 @@ export default function MasonryGrid({ photos, onPhotoClick }) {
                 {author && <span className={styles.author}>{author}</span>}
                 {cameraName && (
                   <div className={styles.cameraLine}>
-                    {brandLogo && <span className={styles.brandLogo}>{brandLogo}</span>}
                     <span className={styles.cameraModel}>{cameraName}</span>
+                    {brandLogo && <span className={styles.brandLogo}>{brandLogo}</span>}
+                    {author && <span className={styles.author}>{author}</span>}
                   </div>
                 )}
               </div>
