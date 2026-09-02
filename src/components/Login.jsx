@@ -4,6 +4,7 @@ import { Form, Input, Button, message, Typography } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { login } from '../api/auth';
 import { useAuth } from '../contexts/AuthContext';
+import { useImagePreloader } from '../data/preloader';
 import styles from './Login.module.css';
 
 const { Text } = Typography;
@@ -12,6 +13,9 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { loginUser } = useAuth();
+
+  // Start preloading images in background while user is on login page
+  useImagePreloader();
 
   const handleSubmit = async (values) => {
     setLoading(true);

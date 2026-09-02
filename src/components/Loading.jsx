@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Spin, Progress } from 'antd';
-import { getRandomPhotos } from '../api/photos';
-import { fallbackPhotos, getPhotoUrl } from '../data/photos';
+import { getOrPreloadPhotos } from '../data/preloader';
+import { fallbackPhotos } from '../data/photos';
 
 export default function Loading({ onPhotosLoaded }) {
   const [progress, setProgress] = useState(0);
@@ -15,67 +15,22 @@ export default function Loading({ onPhotosLoaded }) {
     loadInitiated.current = true;
 
     const loadAndPreload = async () => {
-      let photoData = fallbackPhotos;
-      
-      try {
-        const result = await getRandomPhotos(20);
-        if (result.data && result.data.length > 0) {
-          photoData = result.data;
-        }
-      } catch (err) {
-        console.error('Failed to load photos:', err);
+      // getOrPreloadPhotos will use cache if available (from login page preloader)
+      setStatus('正在加载图片...');
+      const photoData = await getOrPreloadPhotos();
+      const finalPhotos = photoData && photoData.length > 0 ? photoData : fallbackPhotos;
+
+      setProgress(100);
+
+      if (onPhotosLoaded) {
+        onPhotosLoaded(finalPhotos);
       }
 
-      // 预加载所有图片
-      setStatus('正在加载图片...');
-      await preloadImages(photoData);
-      
-      // 通知父组件图片已加载
-      if (onPhotosLoaded) {
-        onPhotosLoaded(photoData);
-      }
-      
-      // 跳转到首页
       navigate('/photography/home', { replace: true });
     };
 
     loadAndPreload();
   }, [navigate, onPhotosLoaded]);
-
-  const preloadImages = (photoList) => {
-    return new Promise((resolve) => {
-      if (photoList.length === 0) {
-        resolve();
-        return;
-      }
-
-      let loadedCount = 0;
-      const total = photoList.length;
-
-      const onLoad = () => {
-        loadedCount++;
-        setProgress(Math.round((loadedCount / total) * 100));
-        if (loadedCount >= total) {
-          resolve();
-        }
-      };
-
-      const onError = () => {
-        loadedCount++;
-        setProgress(Math.round((loadedCount / total) * 100));
-        if (loadedCount >= total) {
-          resolve();
-        }
-      };
-
-      photoList.forEach((photo) => {
-        const img = new Image();
-        img.onload = onLoad;
-        img.onerror = onError;
-        img.src = getPhotoUrl(photo);
-      });
-    });
-  };
 
   return (
     <div style={{ 
