@@ -11,6 +11,8 @@ export default function RoleManage() {
   const [menuTree, setMenuTree] = useState([]);
   const [checkedKeys, setCheckedKeys] = useState([]);
   const [form] = Form.useForm();
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const token = localStorage.getItem('accessToken');
   const authHeaders = { 'Authorization': `Bearer ${token}` };
@@ -75,6 +77,7 @@ export default function RoleManage() {
   };
 
   const handleDelete = async (id) => {
+    setDeletingId(id);
     try {
       const res = await fetch(`/api/roles/${id}`, {
         method: 'DELETE',
@@ -89,10 +92,14 @@ export default function RoleManage() {
       }
     } catch (err) {
       message.error('删除失败');
+    } finally {
+      setDeletingId(null);
     }
   };
 
   const handleSubmit = async () => {
+    if (submitting) return;
+    setSubmitting(true);
     try {
       const values = await form.validateFields();
       const url = editingRole ? `/api/roles/${editingRole.id}` : '/api/roles';
@@ -112,6 +119,8 @@ export default function RoleManage() {
       }
     } catch (err) {
       message.error('操作失败');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -169,7 +178,7 @@ export default function RoleManage() {
         <Space size="small">
           <Button type="link" size="small" icon={<EditOutlined style={{ color: 'var(--accent)' }} />} onClick={() => handleEdit(record)} />
           {record.name !== 'admin' && (
-            <Popconfirm title="确定删除?" onConfirm={() => handleDelete(record.id)}>
+            <Popconfirm title="确定删除?" onConfirm={() => handleDelete(record.id)} okButtonProps={{ loading: deletingId === record.id }}>
               <Button type="link" size="small" danger icon={<DeleteOutlined />} />
             </Popconfirm>
           )}
@@ -196,6 +205,7 @@ export default function RoleManage() {
         onCancel={() => setModalVisible(false)}
         okText="确定"
         cancelText="取消"
+        confirmLoading={submitting}
         width={520}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 24 }}>

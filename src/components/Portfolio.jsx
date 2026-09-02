@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Spin } from 'antd';
 import { getPhotos } from '../api/photos';
 import { fallbackPhotos } from '../data/photos';
 import MasonryGrid from './MasonryGrid';
 import styles from './Portfolio.module.css';
 
-export default function Portfolio({ onPhotoClick }) {
+export default function Portfolio() {
+  const navigate = useNavigate();
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -15,6 +17,10 @@ export default function Portfolio({ onPhotoClick }) {
   const loadMoreRef = useRef(null);
 
   const pageSize = 20;
+
+  const handlePhotoClick = useCallback((photo) => {
+    navigate(`/photography/photo/${photo.id}`);
+  }, [navigate]);
 
   useEffect(() => {
     const loadInitial = async () => {
@@ -111,7 +117,7 @@ export default function Portfolio({ onPhotoClick }) {
       
       <MasonryGrid 
         photos={photos} 
-        onPhotoClick={onPhotoClick} 
+        onPhotoClick={handlePhotoClick} 
       />
       
       <div ref={loadMoreRef} className={styles.loadMoreTrigger}>

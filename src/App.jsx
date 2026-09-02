@@ -13,6 +13,7 @@ import UserManage from './components/UserManage';
 import RoleManage from './components/RoleManage';
 import MenuManage from './components/MenuManage';
 import Profile from './components/Profile';
+import PhotoDetail from './components/PhotoDetail';
 import { fallbackPhotos } from './data/photos';
 import { getRandomPhotos } from './api/photos';
 
@@ -83,7 +84,14 @@ function App() {
           <Route path="/photography/portfolio" element={
             <ProtectedRoute>
               <div style={{ height: '100%', overflow: 'auto', paddingBottom: '80px' }}>
-                <Portfolio onPhotoClick={handlePhotoClick} />
+                <Portfolio />
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/photography/photo/:id" element={
+            <ProtectedRoute>
+              <div style={{ height: '100%', overflow: 'auto' }}>
+                <PhotoDetail photos={photos} />
               </div>
             </ProtectedRoute>
           } />

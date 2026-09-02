@@ -159,10 +159,11 @@
   .photoFrame {
     padding: 10px 10px 40px 10px;
     max-width: 95vw;
+    width: 100%;
   }
   
   .image {
-    max-width: 85vw;
+    max-width: 100%;
     max-height: 50vh;
   }
   

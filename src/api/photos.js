@@ -85,7 +85,7 @@ export async function getRandomPhotos(count = 20) {
   };
 }
 
-export async function getPhoto(id) {
+export async function getPhotoById(id) {
   const result = await request(`${API_BASE}/photos/${id}`);
   return result.data;
 }

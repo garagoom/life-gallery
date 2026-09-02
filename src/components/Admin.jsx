@@ -24,6 +24,9 @@ export default function Admin() {
   const [batchFiles, setBatchFiles] = useState([]);
   const [batchUploading, setBatchUploading] = useState(false);
   const [batchProgress, setBatchProgress] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [batchDeleting, setBatchDeleting] = useState(false);
   const [autoDate, setAutoDate] = useState(null);
   
   const [pagination, setPagination] = useState({
@@ -103,12 +106,15 @@ export default function Admin() {
   };
 
   const handleDelete = async (id) => {
+    setDeletingId(id);
     try {
       await deletePhoto(id);
       message.success('删除成功');
       loadPhotos(pagination.page, pagination.pageSize, searchParams);
     } catch (error) {
       message.error(error.message || '删除失败');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -117,23 +123,17 @@ export default function Admin() {
       message.warning('请先选择要删除的照片');
       return;
     }
-    Modal.confirm({
-      title: '确定删除选中的照片？',
-      content: `将删除 ${selectedRowKeys.length} 张照片，此操作不可撤销`,
-      okText: '确定删除',
-      okType: 'danger',
-      cancelText: '取消',
-      onOk: async () => {
-        try {
-          await batchDeletePhotos(selectedRowKeys);
-          message.success(`成功删除 ${selectedRowKeys.length} 张照片`);
-          setSelectedRowKeys([]);
-          loadPhotos(pagination.page, pagination.pageSize, searchParams);
-        } catch (error) {
-          message.error(error.message || '批量删除失败');
-        }
-      },
-    });
+    setBatchDeleting(true);
+    try {
+      await batchDeletePhotos(selectedRowKeys);
+      message.success(`成功删除 ${selectedRowKeys.length} 张照片`);
+      setSelectedRowKeys([]);
+      loadPhotos(pagination.page, pagination.pageSize, searchParams);
+    } catch (error) {
+      message.error(error.message || '批量删除失败');
+    } finally {
+      setBatchDeleting(false);
+    }
   };
 
   const handleFileSelect = (file) => {
@@ -157,6 +157,8 @@ export default function Admin() {
   };
 
   const handleSubmit = async () => {
+    if (submitting) return;
+    setSubmitting(true);
     try {
       const values = await form.validateFields();
       
@@ -185,6 +187,8 @@ export default function Admin() {
     } catch (error) {
       if (error.errorFields) return;
       message.error(error.message || '操作失败');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -249,7 +253,7 @@ export default function Admin() {
       width: 150,
       render: (_, record) => {
         if (record.camera_make || record.camera_model) {
-          return `${record.camera_make || ''} ${record.camera_model || ''}`.trim();
+          return record.camera_model || record.camera_make || '';
         }
         return '-';
       },
@@ -283,6 +287,7 @@ export default function Admin() {
             onConfirm={() => handleDelete(record.id)}
             okText="确定"
             cancelText="取消"
+            okButtonProps={{ loading: deletingId === record.id }}
           >
             <Button type="link" danger icon={<DeleteOutlined />} />
           </Popconfirm>
@@ -309,6 +314,7 @@ export default function Admin() {
                 okText="确定"
                 cancelText="取消"
                 okType="danger"
+                okButtonProps={{ loading: batchDeleting }}
               >
                 <Button danger icon={<DeleteOutlined />}>
                   批量删除 ({selectedRowKeys.length})
@@ -392,6 +398,7 @@ export default function Admin() {
           onCancel={() => setModalOpen(false)}
           okText="确定"
           cancelText="取消"
+          confirmLoading={submitting}
           width={480}
         >
           <Form

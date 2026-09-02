@@ -12,6 +12,9 @@ export default function UserManage() {
   const [editingUser, setEditingUser] = useState(null);
   const [form] = Form.useForm();
   const { user: currentUser } = useAuth();
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [statusLoadingId, setStatusLoadingId] = useState(null);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -47,26 +50,34 @@ export default function UserManage() {
   };
 
   const handleDelete = async (id) => {
+    setDeletingId(id);
     try {
       await deleteUser(id);
       message.success('删除成功');
       loadUsers();
     } catch (error) {
       message.error(error.message || '删除失败');
+    } finally {
+      setDeletingId(null);
     }
   };
 
   const handleStatusChange = async (id, checked) => {
+    setStatusLoadingId(id);
     try {
       await updateUserStatus(id, checked ? 1 : 0);
       message.success(checked ? '已启用' : '已禁用');
       loadUsers();
     } catch (error) {
       message.error(error.message || '操作失败');
+    } finally {
+      setStatusLoadingId(null);
     }
   };
 
   const handleSubmit = async () => {
+    if (submitting) return;
+    setSubmitting(true);
     try {
       const values = await form.validateFields();
       
@@ -93,6 +104,8 @@ export default function UserManage() {
     } catch (error) {
       if (error.errorFields) return;
       message.error(error.message || '操作失败');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -148,7 +161,8 @@ export default function UserManage() {
         <Switch
           checked={status === 1}
           onChange={(checked) => handleStatusChange(record.id, checked)}
-          disabled={record.id === currentUser?.id}
+          disabled={record.id === currentUser?.id || statusLoadingId === record.id}
+          loading={statusLoadingId === record.id}
           checkedChildren="启用"
           unCheckedChildren="禁用"
         />
@@ -174,6 +188,7 @@ export default function UserManage() {
               onConfirm={() => handleDelete(record.id)}
               okText="确定"
               cancelText="取消"
+              okButtonProps={{ loading: deletingId === record.id }}
             >
               <Button type="link" size="small" danger icon={<DeleteOutlined />} />
             </Popconfirm>
@@ -208,6 +223,7 @@ export default function UserManage() {
         onCancel={() => setModalOpen(false)}
         okText="确定"
         cancelText="取消"
+        confirmLoading={submitting}
         width={480}
       >
         <Form

@@ -8,6 +8,8 @@
   animation: fadeIn 0.8s ease-in forwards;
   animation-delay: 0.5s;
   overflow: hidden;
+  max-width: 100%;
+  word-break: break-word;
 }
 
 @keyframes fadeIn {
@@ -27,6 +29,7 @@
   gap: 5px;
   letter-spacing: 0.5px;
   overflow: hidden;
+  flex-wrap: wrap;
 }
 
 .brand {
@@ -45,4 +48,5 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }

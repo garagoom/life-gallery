@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Popover, Dropdown, Avatar, Menu, Badge, Divider, Typography } from 'antd';
 import { 
@@ -48,6 +49,7 @@ export default function FloatingMenu() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loginUser, hasRole } = useAuth();
+  const [loggingOut, setLoggingOut] = useState(false);
 
   if (!user) {
     navigate('/login', { replace: true });
@@ -87,8 +89,12 @@ export default function FloatingMenu() {
 
   const currentPage = getCurrentPage();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logout();
+    } catch {}
     loginUser(null);
   };
 

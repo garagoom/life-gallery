@@ -31,7 +31,7 @@ export default function ExifInfo({ photo }) {
     return val.includes('mm') ? val : `${val}mm`;
   };
 
-  const cameraName = [photo.camera_make, photo.camera_model].filter(Boolean).join(' ');
+  const cameraName = photo.camera_model || photo.camera_make || '';
   const exposure = formatExposure(photo.exposure_time);
   const fNumber = formatFNumber(photo.f_number);
   const iso = photo.iso ? `ISO ${photo.iso}` : null;

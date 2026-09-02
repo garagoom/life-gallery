@@ -9,6 +9,8 @@ export default function MenuManage() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingMenu, setEditingMenu] = useState(null);
   const [form] = Form.useForm();
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const fetchMenus = async () => {
     setLoading(true);
@@ -43,6 +45,7 @@ export default function MenuManage() {
   };
 
   const handleDelete = async (id) => {
+    setDeletingId(id);
     try {
       const token = localStorage.getItem('accessToken');
       const res = await fetch(`/api/menus/${id}`, {
@@ -58,10 +61,14 @@ export default function MenuManage() {
       }
     } catch (err) {
       message.error('删除失败');
+    } finally {
+      setDeletingId(null);
     }
   };
 
   const handleSubmit = async () => {
+    if (submitting) return;
+    setSubmitting(true);
     try {
       const values = await form.validateFields();
       const token = localStorage.getItem('accessToken');
@@ -85,6 +92,8 @@ export default function MenuManage() {
       }
     } catch (err) {
       message.error('操作失败');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -140,7 +149,7 @@ export default function MenuManage() {
         <Space size="small">
           <Button type="link" size="small" icon={<PlusOutlined style={{ color: 'var(--accent)' }} />} onClick={() => handleAdd(record.id)} title="添加子菜单" />
           <Button type="link" size="small" icon={<EditOutlined style={{ color: 'var(--accent)' }} />} onClick={() => handleEdit(record)} />
-          <Popconfirm title="确定删除?" onConfirm={() => handleDelete(record.id)}>
+          <Popconfirm title="确定删除?" onConfirm={() => handleDelete(record.id)} okButtonProps={{ loading: deletingId === record.id }}>
             <Button type="link" size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
@@ -172,6 +181,7 @@ export default function MenuManage() {
         onCancel={() => setModalVisible(false)}
         okText="确定"
         cancelText="取消"
+        confirmLoading={submitting}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 24 }}>
           <Form.Item name="parent_id" label="上级菜单">

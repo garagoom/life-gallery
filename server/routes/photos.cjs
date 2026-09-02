@@ -363,7 +363,19 @@ router.get('/:id', (req, res) => {
     if (stmt.step()) {
       const photo = stmt.getAsObject();
       stmt.free();
-      success(res, photo);
+
+      // Get prev/next IDs for navigation
+      const prevStmt = db.prepare('SELECT id FROM photos WHERE id < ? ORDER BY id DESC LIMIT 1');
+      prevStmt.bind([parseInt(req.params.id)]);
+      const prevId = prevStmt.step() ? prevStmt.getAsObject().id : null;
+      prevStmt.free();
+
+      const nextStmt = db.prepare('SELECT id FROM photos WHERE id > ? ORDER BY id ASC LIMIT 1');
+      nextStmt.bind([parseInt(req.params.id)]);
+      const nextId = nextStmt.step() ? nextStmt.getAsObject().id : null;
+      nextStmt.free();
+
+      success(res, { ...photo, prev_id: prevId, next_id: nextId });
     } else {
       stmt.free();
       error(res, '照片不存在', 404);
