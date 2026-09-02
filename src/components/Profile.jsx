@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Form, Input, Button, message, Card, Avatar, Descriptions, Divider, Tabs, Typography } from 'antd';
-import { UserOutlined, LockOutlined, SaveOutlined } from '@ant-design/icons';
+import { Form, Input, Button, message, Card, Avatar, Descriptions, Divider, Tabs, Typography, Radio } from 'antd';
+import { UserOutlined, LockOutlined, SaveOutlined, EditOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import styles from './Admin.module.css';
 
 const { Text } = Typography;
+
+const GENDER_LABELS = { male: '男摄影师', female: '女摄影师', other: '其他' };
 
 export default function Profile() {
   const { user, loginUser } = useAuth();
@@ -18,6 +20,8 @@ export default function Profile() {
       profileForm.setFieldsValue({
         displayName: user.displayName || user.username,
         email: user.email || '',
+        gender: user.gender || null,
+        bio: user.bio || '',
       });
     }
   }, [user, profileForm]);
@@ -76,7 +80,6 @@ export default function Profile() {
   };
 
   const roleLabels = { admin: '管理员', editor: '编辑者', viewer: '查看者' };
-  const roleColors = { admin: 'red', editor: 'blue', viewer: 'default' };
 
   const tabItems = [
     {
@@ -92,6 +95,16 @@ export default function Profile() {
           </Form.Item>
           <Form.Item name="email" label="邮箱">
             <Input placeholder="输入邮箱" />
+          </Form.Item>
+          <Form.Item name="gender" label="身份">
+            <Radio.Group>
+              <Radio.Button value="male">男摄影师</Radio.Button>
+              <Radio.Button value="female">女摄影师</Radio.Button>
+              <Radio.Button value="other">其他</Radio.Button>
+            </Radio.Group>
+          </Form.Item>
+          <Form.Item name="bio" label="个人介绍">
+            <Input.TextArea placeholder="介绍自己..." rows={3} maxLength={200} showCount />
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={loading} icon={<SaveOutlined />}>
@@ -147,12 +160,23 @@ export default function Profile() {
       </div>
       <Card style={{ maxWidth: 600 }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24 }}>
-          <Avatar size={64} icon={<UserOutlined />} style={{ backgroundColor: 'var(--accent)' }} />
+          <Avatar
+            size={64}
+            src={user?.avatar}
+            icon={<UserOutlined />}
+            style={{ backgroundColor: 'var(--accent)' }}
+          />
           <div style={{ marginLeft: 16 }}>
             <div style={{ fontSize: 18, fontWeight: 500 }}>{user?.displayName || user?.username}</div>
             <Text type="secondary">{roleLabels[user?.role] || user?.role}</Text>
+            {user?.gender && <Text type="secondary" style={{ marginLeft: 8 }}>· {GENDER_LABELS[user.gender]}</Text>}
           </div>
         </div>
+        {user?.bio && (
+          <div style={{ marginBottom: 16, color: 'var(--text-secondary)', fontSize: 14 }}>
+            {user.bio}
+          </div>
+        )}
         <Divider />
         <Tabs items={tabItems} />
       </Card>

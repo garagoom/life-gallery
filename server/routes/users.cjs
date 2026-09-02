@@ -8,10 +8,15 @@ const router = express.Router();
 
 router.use(authMiddleware, requireAdmin);
 
+const DEFAULT_AVATARS = {
+  male: '/images/avatars/male.svg',
+  female: '/images/avatars/female.svg',
+};
+
 router.get('/', (req, res) => {
   try {
     const db = getDb();
-    const stmt = db.prepare('SELECT id, username, display_name, email, avatar, role, status, created_at, updated_at FROM users ORDER BY created_at DESC');
+    const stmt = db.prepare('SELECT id, username, display_name, email, avatar, gender, bio, role, status, created_at, updated_at FROM users ORDER BY created_at DESC');
     
     const users = [];
     while (stmt.step()) {
@@ -28,7 +33,7 @@ router.get('/', (req, res) => {
 
 router.post('/', (req, res) => {
   try {
-    const { username, password, displayName, email, role } = req.body;
+    const { username, password, displayName, email, role, gender, bio } = req.body;
     
     if (!username || !password) {
       return res.status(400).json({ code: 400, message: '用户名和密码不能为空', data: null });
@@ -63,9 +68,10 @@ router.post('/', (req, res) => {
     }
     
     const hashedPassword = bcrypt.hashSync(password, 10);
+    const avatar = DEFAULT_AVATARS[gender] || DEFAULT_AVATARS.male;
     db.run(
-      'INSERT INTO users (username, password, display_name, email, role) VALUES (?, ?, ?, ?, ?)',
-      [username, hashedPassword, displayName || username, email || null, role]
+      'INSERT INTO users (username, password, display_name, email, role, gender, bio, avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [username, hashedPassword, displayName || username, email || null, role, gender || null, bio || null, avatar]
     );
     saveDb();
     
@@ -78,7 +84,7 @@ router.post('/', (req, res) => {
 
 router.put('/:id', (req, res) => {
   try {
-    const { displayName, email, role } = req.body;
+    const { displayName, email, role, gender, bio } = req.body;
     const userId = parseInt(req.params.id);
     
     const db = getDb();
@@ -97,8 +103,8 @@ router.put('/:id', (req, res) => {
     }
     
     db.run(
-      'UPDATE users SET display_name = ?, email = ?, role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [displayName || existing.display_name, email || existing.email, role || existing.role, userId]
+      'UPDATE users SET display_name = ?, email = ?, role = ?, gender = ?, bio = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [displayName || existing.display_name, email || existing.email, role || existing.role, gender || existing.gender, bio !== undefined ? bio : existing.bio, userId]
     );
     saveDb();
     

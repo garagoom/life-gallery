@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Form, Input, Button, message, Typography } from 'antd';
-import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
+import { Form, Input, Button, message, Typography, Radio, Space } from 'antd';
+import { UserOutlined, LockOutlined, MailOutlined, EditOutlined } from '@ant-design/icons';
 import styles from './Login.module.css';
 
 const { Text } = Typography;
@@ -53,6 +53,16 @@ export default function Register() {
           </Form.Item>
           <Form.Item name="email">
             <Input prefix={<MailOutlined />} placeholder="邮箱（选填）" />
+          </Form.Item>
+          <Form.Item name="gender" label="我是">
+            <Radio.Group>
+              <Radio.Button value="male">男摄影师</Radio.Button>
+              <Radio.Button value="female">女摄影师</Radio.Button>
+              <Radio.Button value="other">其他</Radio.Button>
+            </Radio.Group>
+          </Form.Item>
+          <Form.Item name="bio">
+            <Input.TextArea prefix={<EditOutlined />} placeholder="个人介绍（选填）" rows={2} maxLength={200} showCount />
           </Form.Item>
           <Form.Item name="password" rules={[
             { required: true, message: '请输入密码' },

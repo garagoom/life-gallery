@@ -72,6 +72,8 @@ router.post('/login', (req, res) => {
           displayName: user.display_name,
           email: user.email,
           avatar: user.avatar,
+          gender: user.gender,
+          bio: user.bio,
           role: user.role
         }
       }
@@ -168,6 +170,8 @@ router.post('/refresh', (req, res) => {
           displayName: user.display_name,
           email: user.email,
           avatar: user.avatar,
+          gender: user.gender,
+          bio: user.bio,
           role: user.role
         }
       }
@@ -224,6 +228,8 @@ router.get('/profile', authMiddleware, (req, res) => {
         displayName: user.display_name,
         email: user.email,
         avatar: user.avatar,
+        gender: user.gender,
+        bio: user.bio,
         role: user.role
       }
     });
@@ -235,12 +241,12 @@ router.get('/profile', authMiddleware, (req, res) => {
 
 router.put('/profile', authMiddleware, (req, res) => {
   try {
-    const { displayName, email } = req.body;
+    const { displayName, email, gender, bio } = req.body;
     const db = getDb();
     
     db.run(
-      'UPDATE users SET display_name = ?, email = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [displayName || null, email || null, req.user.id]
+      'UPDATE users SET display_name = ?, email = ?, gender = ?, bio = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [displayName || null, email || null, gender || null, bio || null, req.user.id]
     );
     saveDb();
     

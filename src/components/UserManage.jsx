@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, Select, Switch, Space, Popconfirm, Tag, message } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, Select, Switch, Space, Popconfirm, Tag, Avatar, message } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined } from '@ant-design/icons';
 import { getUsers, createUser, updateUser, updateUserStatus, deleteUser } from '../api/users';
 import { useAuth } from '../contexts/AuthContext';
 import styles from './Admin.module.css';
+
+const GENDER_LABELS = { male: '男', female: '女', other: '其他' };
 
 export default function UserManage() {
   const [users, setUsers] = useState([]);
@@ -45,6 +47,8 @@ export default function UserManage() {
       displayName: record.display_name,
       email: record.email,
       role: record.role,
+      gender: record.gender,
+      bio: record.bio,
     });
     setModalOpen(true);
   };
@@ -86,6 +90,8 @@ export default function UserManage() {
           displayName: values.displayName,
           email: values.email,
           role: values.role,
+          gender: values.gender,
+          bio: values.bio,
         });
         message.success('更新成功');
       } else {
@@ -95,6 +101,8 @@ export default function UserManage() {
           displayName: values.displayName,
           email: values.email,
           role: values.role,
+          gender: values.gender,
+          bio: values.bio,
         });
         message.success('创建成功');
       }
@@ -123,16 +131,34 @@ export default function UserManage() {
 
   const columns = [
     {
-      title: '用户名',
-      dataIndex: 'username',
-      key: 'username',
-      ellipsis: true,
+      title: '用户',
+      key: 'user',
+      fixed: 'left',
+      width: 200,
+      render: (_, record) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Avatar src={record.avatar} icon={<UserOutlined />} size={36} />
+          <div>
+            <div style={{ fontWeight: 500 }}>{record.display_name || record.username}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>@{record.username}</div>
+          </div>
+        </div>
+      ),
     },
     {
-      title: '显示名称',
-      dataIndex: 'display_name',
-      key: 'display_name',
+      title: '性别',
+      dataIndex: 'gender',
+      key: 'gender',
+      width: 80,
+      align: 'center',
+      render: (g) => g ? GENDER_LABELS[g] : '-',
+    },
+    {
+      title: '简介',
+      dataIndex: 'bio',
+      key: 'bio',
       ellipsis: true,
+      render: (text) => text || '-',
     },
     {
       title: '邮箱',
@@ -213,7 +239,7 @@ export default function UserManage() {
         rowKey="id"
         loading={loading}
         pagination={false}
-        scroll={{ x: 800 }}
+        scroll={{ x: 900 }}
       />
 
       <Modal
@@ -267,6 +293,18 @@ export default function UserManage() {
           
           <Form.Item name="email" label="邮箱">
             <Input placeholder="输入邮箱" />
+          </Form.Item>
+
+          <Form.Item name="gender" label="性别">
+            <Select allowClear placeholder="选择性别">
+              <Select.Option value="male">男</Select.Option>
+              <Select.Option value="female">女</Select.Option>
+              <Select.Option value="other">其他</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item name="bio" label="个人介绍">
+            <Input.TextArea placeholder="输入个人介绍" rows={2} maxLength={200} showCount />
           </Form.Item>
           
           <Form.Item name="role" label="角色" rules={[{ required: true }]}>

@@ -3,9 +3,14 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { getDb, saveDb } = require('../db.cjs');
 
+const DEFAULT_AVATARS = {
+  male: '/images/avatars/male.svg',
+  female: '/images/avatars/female.svg',
+};
+
 router.post('/register', (req, res) => {
   try {
-    const { username, password, displayName, email } = req.body;
+    const { username, password, displayName, email, gender, bio } = req.body;
     if (!username || !password) {
       return res.status(400).json({ code: 400, message: '用户名和密码不能为空' });
     }
@@ -22,6 +27,10 @@ router.post('/register', (req, res) => {
       return res.status(400).json({ code: 400, message: '密码长度需在8-20个字符之间' });
     }
 
+    if (gender && !['male', 'female', 'other'].includes(gender)) {
+      return res.status(400).json({ code: 400, message: '无效的性别值' });
+    }
+
     const db = getDb();
 
     const existing = db.exec(`SELECT id FROM users WHERE username = ?`, [username])[0];
@@ -32,10 +41,11 @@ router.post('/register', (req, res) => {
     const hashedPassword = bcrypt.hashSync(password, 10);
     const viewerRole = db.exec(`SELECT id FROM roles WHERE name = 'viewer'`)[0];
     const roleId = viewerRole && viewerRole.values.length > 0 ? viewerRole.values[0][0] : 1;
+    const avatar = DEFAULT_AVATARS[gender] || DEFAULT_AVATARS.male;
 
     db.run(
-      `INSERT INTO users (username, password, display_name, email, role, role_id) VALUES (?, ?, ?, ?, ?, ?)`,
-      [username, hashedPassword, displayName || username, email || null, 'viewer', roleId]
+      `INSERT INTO users (username, password, display_name, email, gender, bio, avatar, role, role_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [username, hashedPassword, displayName || username, email || null, gender || null, bio || null, avatar, 'viewer', roleId]
     );
     saveDb();
 

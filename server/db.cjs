@@ -65,6 +65,8 @@ async function initDb() {
   addColumnIfNotExists('flash', 'TEXT');
   addColumnIfNotExists('color_space', 'TEXT');
   addColumnIfNotExists('histogram', 'TEXT');
+  addColumnIfNotExists('gender', 'TEXT');
+  addColumnIfNotExists('bio', 'TEXT');
 
   // Create users table
   db.run(`
