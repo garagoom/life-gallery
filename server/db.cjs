@@ -64,6 +64,7 @@ async function initDb() {
   addColumnIfNotExists('metering_mode', 'TEXT');
   addColumnIfNotExists('flash', 'TEXT');
   addColumnIfNotExists('color_space', 'TEXT');
+  addColumnIfNotExists('histogram', 'TEXT');
 
   // Create users table
   db.run(`

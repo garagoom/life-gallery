@@ -16,6 +16,7 @@ import Profile from './components/Profile';
 import PhotoDetail from './components/PhotoDetail';
 import { fallbackPhotos } from './data/photos';
 import { getRandomPhotos } from './api/photos';
+import { ThemeProvider } from './contexts/ThemeContext';
 
 const hideMenuPaths = ['/login', '/register', '/loading'];
 
@@ -61,6 +62,7 @@ function App() {
   }, []);
 
   return (
+    <ThemeProvider>
     <BrowserRouter>
       <div style={{ height: '100%' }}>
         <Routes>
@@ -148,6 +150,7 @@ function App() {
         )}
       </div>
     </BrowserRouter>
+    </ThemeProvider>
   );
 }
 

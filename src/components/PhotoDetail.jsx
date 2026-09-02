@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getPhotoById } from '../api/photos';
 import { getPhotoUrl } from '../data/photos';
@@ -20,23 +20,13 @@ export default function PhotoDetail() {
     return () => { cancelled = true; };
   }, [id]);
 
-  const goPrev = useCallback(() => {
-    if (photo?.prev_id != null) navigate(`/photography/photo/${photo.prev_id}`);
-  }, [photo, navigate]);
-
-  const goNext = useCallback(() => {
-    if (photo?.next_id != null) navigate(`/photography/photo/${photo.next_id}`);
-  }, [photo, navigate]);
-
   useEffect(() => {
     const handleKey = (e) => {
-      if (e.key === 'ArrowLeft') goPrev();
-      if (e.key === 'ArrowRight') goNext();
       if (e.key === 'Escape') navigate('/photography/portfolio');
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [goPrev, goNext, navigate]);
+  }, [navigate]);
 
   if (loading) {
     return (
@@ -90,28 +80,19 @@ export default function PhotoDetail() {
     { label: '软件', value: photo.software },
   ].filter(item => item.value);
 
+  const histogramData = (() => {
+    if (!photo?.histogram) return null;
+    try { return JSON.parse(photo.histogram); } catch { return null; }
+  })();
+
   return (
     <div className={styles.page}>
       <div className={styles.topNav}>
         <button
           className={styles.navBtn}
-          onClick={goPrev}
-          disabled={!photo.prev_id}
-        >
-          上一页
-        </button>
-        <button
-          className={styles.navBtn}
           onClick={() => navigate('/photography/portfolio')}
         >
           返回
-        </button>
-        <button
-          className={styles.navBtn}
-          onClick={goNext}
-          disabled={!photo.next_id}
-        >
-          下一页
         </button>
       </div>
 
@@ -150,7 +131,57 @@ export default function PhotoDetail() {
             </div>
           </div>
         )}
+
+        {histogramData && (
+          <div className={styles.exifCard}>
+            <h3 className={styles.exifTitle}>色相直方图</h3>
+            <Histogram data={histogramData} />
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+function Histogram({ data }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !data) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+
+    ctx.clearRect(0, 0, w, h);
+
+    const channels = [
+      { arr: data.r, color: 'rgba(255, 0, 0, 0.5)' },
+      { arr: data.g, color: 'rgba(0, 180, 0, 0.5)' },
+      { arr: data.b, color: 'rgba(0, 80, 255, 0.5)' },
+    ];
+
+    for (const ch of channels) {
+      ctx.beginPath();
+      ctx.moveTo(0, h);
+      for (let i = 0; i < 256; i++) {
+        const x = (i / 255) * w;
+        const y = h - (ch.arr[i] / 100) * h;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(w, h);
+      ctx.closePath();
+      ctx.fillStyle = ch.color;
+      ctx.fill();
+    }
+  }, [data]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={512}
+      height={120}
+      style={{ width: '100%', height: 120, borderRadius: 6, background: '#1a1a1a' }}
+    />
   );
 }

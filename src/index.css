@@ -13,6 +13,15 @@
   --border: #d4cdc1;
 }
 
+:root[data-theme="dark"] {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #242424;
+  --text-primary: #e0e0e0;
+  --text-secondary: #b8a080;
+  --accent: #b8a080;
+  --border: #3a3a3a;
+}
+
 html, body, #root {
   height: 100%;
   overflow: hidden;
@@ -37,6 +46,15 @@ a {
   --ant-text-color-secondary: #8b7355;
   --ant-background: #f5f0e8;
   --ant-background-light: #ebe5d9;
+}
+
+:root[data-theme="dark"] {
+  --ant-primary-color: #b8a080;
+  --ant-border-color: #3a3a3a;
+  --ant-text-color: #e0e0e0;
+  --ant-text-color-secondary: #b8a080;
+  --ant-background: #1a1a1a;
+  --ant-background-light: #242424;
 }
 
 /* Antd component overrides */

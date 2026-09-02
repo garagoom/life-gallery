@@ -88,3 +88,19 @@
 .userItem:hover {
   background: rgba(139, 115, 85, 0.1);
 }
+
+.themeToggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.themeToggle:hover {
+  background: rgba(139, 115, 85, 0.1);
+}

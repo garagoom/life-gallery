@@ -11,9 +11,12 @@ import {
   PictureOutlined,
   SafetyOutlined,
   MenuOutlined,
-  AppstoreOutlined
+  AppstoreOutlined,
+  BulbOutlined,
+  BulbFilled
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { logout } from '../api/auth';
 import styles from './FloatingMenu.module.css';
 
@@ -49,6 +52,7 @@ export default function FloatingMenu() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loginUser, hasRole } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [loggingOut, setLoggingOut] = useState(false);
 
   if (!user) {
@@ -173,6 +177,15 @@ export default function FloatingMenu() {
           </div>
         </>
       )}
+
+      <Divider style={{ margin: '4px 0' }} />
+
+      <div className={styles.section}>
+        <div className={styles.themeToggle} onClick={toggleTheme}>
+          {theme === 'light' ? <BulbOutlined /> : <BulbFilled />}
+          <Text>{theme === 'light' ? '深色模式' : '浅色模式'}</Text>
+        </div>
+      </div>
     </div>
   );
 
