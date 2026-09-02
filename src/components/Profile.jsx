@@ -1,13 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
-import { Form, Input, Button, message, Card, Avatar, Divider, Tabs, Typography, Radio } from 'antd';
+import { useState, useEffect } from 'react';
+import { Form, Input, Button, message, Card, Avatar, Divider, Tabs, Typography, Radio, Upload } from 'antd';
 import { UserOutlined, LockOutlined, SaveOutlined, CameraOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { uploadAvatar } from '../api/auth';
+import AvatarCropper from './AvatarCropper';
 import styles from './Admin.module.css';
 
 const { Text } = Typography;
 
-const GENDER_LABELS = { male: '男摄影师', female: '女摄影师', secret: '保密' };
+const GENDER_LABELS = { male: '男', female: '女', secret: '保密' };
 
 export default function Profile() {
   const { user, loginUser } = useAuth();
@@ -16,7 +17,8 @@ export default function Profile() {
   const [avatarLoading, setAvatarLoading] = useState(false);
   const [profileForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
-  const fileInputRef = useRef(null);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [cropImage, setCropImage] = useState(null);
 
   useEffect(() => {
     if (user) {
@@ -29,13 +31,23 @@ export default function Profile() {
     }
   }, [user, profileForm]);
 
-  const handleAvatarChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleBeforeUpload = (file) => {
     if (file.size > 5 * 1024 * 1024) {
       message.error('图片不能超过 5MB');
-      return;
+      return false;
     }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setCropImage(e.target.result);
+      setCropOpen(true);
+    };
+    reader.readAsDataURL(file);
+    return false;
+  };
+
+  const handleCropDone = async (file) => {
+    setCropOpen(false);
+    setCropImage(null);
     setAvatarLoading(true);
     try {
       const data = await uploadAvatar(file);
@@ -45,7 +57,11 @@ export default function Profile() {
       message.error(err.message || '头像上传失败');
     }
     setAvatarLoading(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleCropCancel = () => {
+    setCropOpen(false);
+    setCropImage(null);
   };
 
   const handleUpdateProfile = async (values) => {
@@ -118,10 +134,10 @@ export default function Profile() {
           <Form.Item name="email" label="邮箱">
             <Input placeholder="输入邮箱" />
           </Form.Item>
-          <Form.Item name="gender" label="身份">
+          <Form.Item name="gender" label="性别">
             <Radio.Group>
-              <Radio.Button value="male">男摄影师</Radio.Button>
-              <Radio.Button value="female">女摄影师</Radio.Button>
+              <Radio.Button value="male">男</Radio.Button>
+              <Radio.Button value="female">女</Radio.Button>
               <Radio.Button value="secret">保密</Radio.Button>
             </Radio.Group>
           </Form.Item>
@@ -182,30 +198,29 @@ export default function Profile() {
       </div>
       <Card style={{ maxWidth: 600 }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24 }}>
-          <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => fileInputRef.current?.click()}>
-            <Avatar
-              size={64}
-              src={user?.avatar}
-              icon={<UserOutlined />}
-              style={{ backgroundColor: 'var(--accent)' }}
-            />
-            <div style={{
-              position: 'absolute', bottom: 0, right: 0,
-              width: 24, height: 24, borderRadius: '50%',
-              background: 'var(--accent)', display: 'flex',
-              alignItems: 'center', justifyContent: 'center',
-              border: '2px solid var(--bg-secondary)',
-            }}>
-              <CameraOutlined style={{ color: '#fff', fontSize: 12 }} />
+          <Upload
+            showUploadList={false}
+            beforeUpload={handleBeforeUpload}
+            accept="image/*"
+          >
+            <div style={{ position: 'relative', cursor: 'pointer' }}>
+              <Avatar
+                size={64}
+                src={user?.avatar}
+                icon={<UserOutlined />}
+                style={{ backgroundColor: 'var(--accent)' }}
+              />
+              <div style={{
+                position: 'absolute', bottom: 0, right: 0,
+                width: 24, height: 24, borderRadius: '50%',
+                background: 'var(--accent)', display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
+                border: '2px solid var(--bg-secondary)',
+              }}>
+                <CameraOutlined style={{ color: '#fff', fontSize: 12 }} />
+              </div>
             </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={handleAvatarChange}
-            />
-          </div>
+          </Upload>
           <div style={{ marginLeft: 16 }}>
             <div style={{ fontSize: 18, fontWeight: 500 }}>{user?.displayName || user?.username}</div>
             <Text type="secondary">{roleLabels[user?.role] || user?.role}</Text>
@@ -223,6 +238,12 @@ export default function Profile() {
         <Divider />
         <Tabs items={tabItems} />
       </Card>
+      <AvatarCropper
+        open={cropOpen}
+        imageSrc={cropImage}
+        onCrop={handleCropDone}
+        onCancel={handleCropCancel}
+      />
     </div>
   );
 }

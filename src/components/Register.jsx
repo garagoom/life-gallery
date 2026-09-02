@@ -54,10 +54,10 @@ export default function Register() {
           <Form.Item name="email">
             <Input prefix={<MailOutlined />} placeholder="邮箱（选填）" />
           </Form.Item>
-          <Form.Item name="gender" label="我是">
+          <Form.Item name="gender" label="性别">
             <Radio.Group>
-              <Radio.Button value="male">男摄影师</Radio.Button>
-              <Radio.Button value="female">女摄影师</Radio.Button>
+              <Radio.Button value="male">男</Radio.Button>
+              <Radio.Button value="female">女</Radio.Button>
               <Radio.Button value="secret">保密</Radio.Button>
             </Radio.Group>
           </Form.Item>

@@ -108,7 +108,9 @@ export default function UserManage() {
       }
       
       setModalOpen(false);
-      loadUsers();
+      setEditingUser(null);
+      form.resetFields();
+      await loadUsers();
     } catch (error) {
       if (error.errorFields) return;
       message.error(error.message || '操作失败');
