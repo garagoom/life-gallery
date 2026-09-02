@@ -226,38 +226,6 @@ async function processPhoto(file, title, date, category) {
 
   const rotation = (Math.random() * 6 - 3).toFixed(1);
 
-  // Generate histogram data from the converted WebP
-  let histogram = null;
-  try {
-    const { data: pixelData, info } = await sharp(webpPath)
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-
-    const channels = info.channels;
-    const r = new Uint32Array(256);
-    const g = new Uint32Array(256);
-    const b = new Uint32Array(256);
-
-    for (let i = 0; i < pixelData.length; i += channels) {
-      r[pixelData[i]]++;
-      if (channels > 1) g[pixelData[i + 1]]++;
-      if (channels > 2) b[pixelData[i + 2]]++;
-    }
-
-    // Normalize to 0-100
-    const maxVal = Math.max(
-      Math.max(...r), Math.max(...g), Math.max(...b)
-    ) || 1;
-
-    histogram = JSON.stringify({
-      r: Array.from(r).map(v => Math.round((v / maxVal) * 100)),
-      g: Array.from(g).map(v => Math.round((v / maxVal) * 100)),
-      b: Array.from(b).map(v => Math.round((v / maxVal) * 100)),
-    });
-  } catch (e) {
-    console.error('Histogram generation error:', e);
-  }
-
   let photoDate = date;
   if (!photoDate && formattedExif.dateTime) {
     photoDate = formattedExif.dateTime;
@@ -285,7 +253,6 @@ async function processPhoto(file, title, date, category) {
     meteringMode: formattedExif.meteringMode,
     flash: formattedExif.flash,
     colorSpace: formattedExif.colorSpace,
-    histogram,
   };
 }
 
@@ -434,8 +401,8 @@ router.post('/', authMiddleware, requireEditor, upload.single('file'), async (re
     db.run(
       `INSERT INTO photos (title, filename, thumbnail, date, category, rotation, 
        camera_make, camera_model, exposure_time, f_number, iso, focal_length,
-       software, lens_model, white_balance, metering_mode, flash, color_space, uploaded_by, histogram) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       software, lens_model, white_balance, metering_mode, flash, color_space, uploaded_by) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         photoData.title, photoData.filename, photoData.thumbnail,
         photoData.date, photoData.category, photoData.rotation,
@@ -443,7 +410,6 @@ router.post('/', authMiddleware, requireEditor, upload.single('file'), async (re
         photoData.fNumber, photoData.iso, photoData.focalLength,
         photoData.software, photoData.lensModel, photoData.whiteBalance,
         photoData.meteringMode, photoData.flash, photoData.colorSpace, uploadedBy,
-        photoData.histogram
       ]
     );
     saveDb();
@@ -481,8 +447,8 @@ router.post('/batch', authMiddleware, requireEditor, upload.array('files', 100),
         db.run(
           `INSERT INTO photos (title, filename, thumbnail, date, category, rotation,
            camera_make, camera_model, exposure_time, f_number, iso, focal_length,
-           software, lens_model, white_balance, metering_mode, flash, color_space, uploaded_by, histogram)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           software, lens_model, white_balance, metering_mode, flash, color_space, uploaded_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             photoData.title, photoData.filename, photoData.thumbnail,
             photoData.date, photoData.category, photoData.rotation,
@@ -490,7 +456,6 @@ router.post('/batch', authMiddleware, requireEditor, upload.array('files', 100),
             photoData.fNumber, photoData.iso, photoData.focalLength,
             photoData.software, photoData.lensModel, photoData.whiteBalance,
             photoData.meteringMode, photoData.flash, photoData.colorSpace, uploadedBy,
-            photoData.histogram
           ]
         );
 

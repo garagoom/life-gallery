@@ -34,23 +34,24 @@ export default function Loading({ onPhotosLoaded }) {
         }
 
         setProgress(30);
-        setStatus(`正在加载 ${photos.length} 张图片...`);
+        setStatus(`正在加载 ${Math.min(5, photos.length)} 张图片...`);
 
-        // Phase 2: Preload images into browser cache
+        // Phase 2: Preload only first 5 images for fast startup
+        const preloadCount = Math.min(5, photos.length);
         let loaded = 0;
         await Promise.allSettled(
-          photos.map((photo) =>
+          photos.slice(0, preloadCount).map((photo) =>
             new Promise((resolve) => {
               const img = new Image();
               img.onload = () => {
                 loaded++;
-                const pct = 30 + Math.round((loaded / photos.length) * 65);
+                const pct = 30 + Math.round((loaded / preloadCount) * 65);
                 setProgress(pct);
                 resolve();
               };
               img.onerror = () => {
                 loaded++;
-                const pct = 30 + Math.round((loaded / photos.length) * 65);
+                const pct = 30 + Math.round((loaded / preloadCount) * 65);
                 setProgress(pct);
                 resolve();
               };

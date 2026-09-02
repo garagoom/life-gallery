@@ -1,44 +1,54 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getPhotoUrl } from '../data/photos';
 import styles from './HomePage.module.css';
 
 export default function HomePage({ onPhotoClick, isPaused, initialPhotos = [] }) {
-  const [shuffledPhotos, setShuffledPhotos] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const shuffledRef = useRef([]);
+  const preloadImgRef = useRef(null);
 
-  // Shuffle photos when initialPhotos changes
   useEffect(() => {
     if (initialPhotos.length > 0) {
-      const shuffled = [...initialPhotos].sort(() => Math.random() - 0.5);
-      setShuffledPhotos(shuffled);
+      shuffledRef.current = [...initialPhotos].sort(() => Math.random() - 0.5);
+      setCurrentIndex(0);
     }
   }, [initialPhotos]);
 
-  const photoWidths = useMemo(() => {
-    return shuffledPhotos.map(() => 35 + Math.random() * 35);
-  }, [shuffledPhotos]);
-
-  const goToNext = useCallback(() => {
-    if (shuffledPhotos.length === 0) return;
-    setCurrentIndex((prev) => (prev + 1) % shuffledPhotos.length);
-  }, [shuffledPhotos.length]);
-
-  useEffect(() => {
-    if (isPaused || shuffledPhotos.length === 0) return;
-    const interval = setInterval(goToNext, 500);
-    return () => clearInterval(interval);
-  }, [isPaused, goToNext, shuffledPhotos.length]);
-
-  const handleClick = () => {
-    if (shuffledPhotos[currentIndex]) {
-      onPhotoClick(shuffledPhotos[currentIndex]);
+  const photoWidths = useRef({});
+  const getPhotoWidth = (id) => {
+    if (!photoWidths.current[id]) {
+      photoWidths.current[id] = 35 + Math.random() * 35;
     }
+    return photoWidths.current[id];
   };
 
-  if (shuffledPhotos.length === 0) return null;
+  // Preload next thumbnail
+  useEffect(() => {
+    const photos = shuffledRef.current;
+    if (photos.length <= 1) return;
+    const nextIdx = (currentIndex + 1) % photos.length;
+    const img = new Image();
+    img.src = getPhotoUrl(photos[nextIdx]);
+    preloadImgRef.current = img;
+  }, [currentIndex]);
 
-  const currentPhoto = shuffledPhotos[currentIndex];
-  const currentWidth = photoWidths[currentIndex] || 50;
+  useEffect(() => {
+    if (isPaused || shuffledRef.current.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentIndex(prev => (prev + 1) % shuffledRef.current.length);
+    }, 500);
+    return () => clearInterval(interval);
+  }, [isPaused, shuffledRef.current.length]);
+
+  const handleClick = () => {
+    const photo = shuffledRef.current[currentIndex];
+    if (photo) onPhotoClick(photo);
+  };
+
+  if (shuffledRef.current.length === 0) return null;
+
+  const currentPhoto = shuffledRef.current[currentIndex];
+  const currentWidth = getPhotoWidth(currentPhoto.id);
 
   return (
     <div className={styles.container} onClick={handleClick}>

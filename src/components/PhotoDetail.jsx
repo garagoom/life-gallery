@@ -2,19 +2,32 @@ import { useEffect, useCallback, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getPhotoById } from '../api/photos';
 import { getPhotoUrl } from '../data/photos';
+import { getCachedPhoto, cachePhoto } from '../utils/imageCache';
+import { extractHistogram } from '../utils/extractHistogram';
 import styles from './PhotoDetail.module.css';
 
 export default function PhotoDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [photo, setPhoto] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [photo, setPhoto] = useState(() => getCachedPhoto(id));
+  const [loading, setLoading] = useState(!getCachedPhoto(id));
 
   useEffect(() => {
     let cancelled = false;
+    const cached = getCachedPhoto(id);
+    if (cached) {
+      setPhoto(cached);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     getPhotoById(id)
-      .then(data => { if (!cancelled) setPhoto(data); })
+      .then(data => {
+        if (!cancelled) {
+          cachePhoto(id, data);
+          setPhoto(data);
+        }
+      })
       .catch(() => { if (!cancelled) setPhoto(null); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
@@ -80,10 +93,21 @@ export default function PhotoDetail() {
     { label: '软件', value: photo.software },
   ].filter(item => item.value);
 
-  const histogramData = (() => {
-    if (!photo?.histogram) return null;
-    try { return JSON.parse(photo.histogram); } catch { return null; }
-  })();
+  const [histogramData, setHistogramData] = useState(null);
+  const imgRef = useRef(null);
+
+  useEffect(() => {
+    if (!photo || histogramData) return;
+    const img = imgRef.current;
+    if (!img || !img.complete || !img.naturalWidth) return;
+    setHistogramData(extractHistogram(img));
+  }, [photo, histogramData]);
+
+  const handleImgLoad = useCallback(() => {
+    if (histogramData) return;
+    const img = imgRef.current;
+    if (img) setHistogramData(extractHistogram(img));
+  }, [histogramData]);
 
   return (
     <div className={styles.page}>
@@ -99,9 +123,11 @@ export default function PhotoDetail() {
       <div className={styles.content}>
         <div className={styles.photoSection}>
           <img
+            ref={imgRef}
             src={getPhotoUrl(photo)}
             alt={photo.title}
             className={styles.photo}
+            onLoad={handleImgLoad}
           />
         </div>
 
@@ -150,10 +176,16 @@ function Histogram({ data }) {
     const canvas = canvasRef.current;
     if (!canvas || !data) return;
     const ctx = canvas.getContext('2d');
-    const w = canvas.width;
-    const h = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
+    const displayW = canvas.clientWidth;
+    const displayH = canvas.clientHeight;
+    canvas.width = displayW * dpr;
+    canvas.height = displayH * dpr;
+    ctx.scale(dpr, dpr);
 
-    ctx.clearRect(0, 0, w, h);
+    ctx.clearRect(0, 0, displayW, displayH);
+
+    const maxVal = Math.max(...data.r, ...data.g, ...data.b, 1);
 
     const channels = [
       { arr: data.r, color: 'rgba(255, 0, 0, 0.5)' },
@@ -163,13 +195,13 @@ function Histogram({ data }) {
 
     for (const ch of channels) {
       ctx.beginPath();
-      ctx.moveTo(0, h);
+      ctx.moveTo(0, displayH);
       for (let i = 0; i < 256; i++) {
-        const x = (i / 255) * w;
-        const y = h - (ch.arr[i] / 100) * h;
+        const x = (i / 255) * displayW;
+        const y = displayH - (ch.arr[i] / maxVal) * displayH * 0.95;
         ctx.lineTo(x, y);
       }
-      ctx.lineTo(w, h);
+      ctx.lineTo(displayW, displayH);
       ctx.closePath();
       ctx.fillStyle = ch.color;
       ctx.fill();
@@ -179,9 +211,7 @@ function Histogram({ data }) {
   return (
     <canvas
       ref={canvasRef}
-      width={512}
-      height={120}
-      style={{ width: '100%', height: 120, borderRadius: 6, background: '#1a1a1a' }}
+      style={{ width: '100%', height: 120, borderRadius: 6, background: 'var(--bg-primary)' }}
     />
   );
 }

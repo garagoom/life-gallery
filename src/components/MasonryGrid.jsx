@@ -1,6 +1,8 @@
 import Masonry from 'react-masonry-css';
 import { getPhotoUrl } from '../data/photos';
 import { getBrandLogo } from '../data/brandLogos';
+import { cachePhoto } from '../utils/imageCache';
+import { useCallback } from 'react';
 import styles from './MasonryGrid.module.css';
 
 const breakpointColumnsObj = {
@@ -10,6 +12,11 @@ const breakpointColumnsObj = {
 };
 
 export default function MasonryGrid({ photos, onPhotoClick }) {
+  const handleClick = useCallback((photo) => {
+    cachePhoto(photo.id, photo);
+    onPhotoClick(photo);
+  }, [onPhotoClick]);
+
   return (
     <Masonry
       breakpointCols={breakpointColumnsObj}
@@ -19,13 +26,13 @@ export default function MasonryGrid({ photos, onPhotoClick }) {
       {photos.map((photo) => {
         const cameraName = photo.camera_model || photo.camera_make || '';
         const brandLogo = getBrandLogo(photo.camera_make);
-        const author = photo.user?.displayName || photo.user?.username || '';
+        const author = photo.uploaded_by || photo.user?.displayName || photo.user?.username || '';
 
         return (
           <div
             key={photo.id}
             className={styles.photoItem}
-            onClick={() => onPhotoClick(photo)}
+            onClick={() => handleClick(photo)}
           >
             <img
               src={getPhotoUrl(photo)}
@@ -35,7 +42,6 @@ export default function MasonryGrid({ photos, onPhotoClick }) {
             />
             <div className={styles.overlay}>
               <div className={styles.overlayInfo}>
-                {author && <span className={styles.author}>{author}</span>}
                 {cameraName && (
                   <div className={styles.cameraLine}>
                     <span className={styles.cameraModel}>{cameraName}</span>

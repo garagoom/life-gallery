@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Spin } from 'antd';
 import { getPhotos } from '../api/photos';
 import { fallbackPhotos } from '../data/photos';
+import { cachePhotoList } from '../utils/imageCache';
 import MasonryGrid from './MasonryGrid';
 import styles from './Portfolio.module.css';
 
@@ -27,6 +28,7 @@ export default function Portfolio() {
       try {
         const result = await getPhotos({ page: 1, pageSize });
         const data = result.data || [];
+        cachePhotoList(data);
         setPhotos(data);
         setHasMore(data.length >= pageSize);
         setPage(1);
@@ -51,6 +53,7 @@ export default function Portfolio() {
       const newPhotos = result.data || [];
       
       if (newPhotos.length > 0) {
+        cachePhotoList(newPhotos);
         setPhotos(prev => [...prev, ...newPhotos]);
         setPage(nextPage);
         setHasMore(newPhotos.length >= pageSize);

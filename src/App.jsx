@@ -15,8 +15,7 @@ import MenuManage from './components/MenuManage';
 import Profile from './components/Profile';
 import PhotoDetail from './components/PhotoDetail';
 import { fallbackPhotos } from './data/photos';
-import { getRandomPhotos } from './api/photos';
-import { ThemeProvider } from './contexts/ThemeContext';
+
 
 const hideMenuPaths = ['/login', '/register', '/loading'];
 
@@ -26,12 +25,23 @@ function FloatingMenuWrapper() {
   return <FloatingMenu />;
 }
 
+function initPhotos() {
+  try {
+    const cached = sessionStorage.getItem('preloadedPhotos');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed.length > 0) return { photos: parsed, loaded: true };
+    }
+  } catch {}
+  return { photos: fallbackPhotos, loaded: false };
+}
+
 function App() {
+  const init = useRef(initPhotos());
   const [lightboxPhoto, setLightboxPhoto] = useState(null);
   const [isPaused, setIsPaused] = useState(false);
-  const [photos, setPhotos] = useState(fallbackPhotos);
-  const [photosLoaded, setPhotosLoaded] = useState(false);
-  const loadInitiated = useRef(false);
+  const [photos, setPhotos] = useState(init.current.photos);
+  const [photosLoaded, setPhotosLoaded] = useState(init.current.loaded);
 
   const handlePhotosLoaded = useCallback((loadedPhotos) => {
     if (loadedPhotos && loadedPhotos.length > 0) {
@@ -62,7 +72,6 @@ function App() {
   }, []);
 
   return (
-    <ThemeProvider>
     <BrowserRouter>
       <div style={{ height: '100%' }}>
         <Routes>
@@ -71,17 +80,13 @@ function App() {
           <Route path="/loading" element={<Loading onPhotosLoaded={handlePhotosLoaded} />} />
 
           <Route path="/photography/home" element={
-            photosLoaded ? (
-              <ProtectedRoute>
-                <HomePage
-                  onPhotoClick={handlePhotoClick}
-                  isPaused={isPaused}
-                  initialPhotos={photos}
-                />
-              </ProtectedRoute>
-            ) : (
-              <Navigate to="/loading" replace />
-            )
+            <ProtectedRoute>
+              <HomePage
+                onPhotoClick={handlePhotoClick}
+                isPaused={isPaused}
+                initialPhotos={photos}
+              />
+            </ProtectedRoute>
           } />
           <Route path="/photography/portfolio" element={
             <ProtectedRoute>
@@ -93,7 +98,7 @@ function App() {
           <Route path="/photography/photo/:id" element={
             <ProtectedRoute>
               <div style={{ height: '100%', overflow: 'auto' }}>
-                <PhotoDetail photos={photos} />
+                <PhotoDetail />
               </div>
             </ProtectedRoute>
           } />
@@ -133,9 +138,9 @@ function App() {
             </ProtectedRoute>
           } />
 
-          <Route path="/" element={<Navigate to="/loading" replace />} />
-          <Route path="/photography" element={<Navigate to="/loading" replace />} />
-          <Route path="*" element={<Navigate to="/loading" replace />} />
+          <Route path="/" element={<Navigate to="/photography/home" replace />} />
+          <Route path="/photography" element={<Navigate to="/photography/home" replace />} />
+          <Route path="*" element={<Navigate to="/photography/home" replace />} />
         </Routes>
 
         <FloatingMenuWrapper />
@@ -150,7 +155,6 @@ function App() {
         )}
       </div>
     </BrowserRouter>
-    </ThemeProvider>
   );
 }
 

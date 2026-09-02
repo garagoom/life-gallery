@@ -1,4 +1,4 @@
-const logoStyle = { height: 14, width: 'auto' };
+const logoStyle = { height: 20, width: 'auto' };
 
 const svgText = (text, opts = {}) => (
   <svg viewBox={`0 0 ${text.length * 12 + 4} 20`} style={logoStyle}>
