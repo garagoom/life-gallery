@@ -49,7 +49,6 @@ export default function HomePage({ onPhotoClick, isPaused, initialPhotos = [] })
       <div className={styles.photoContainer}>
         <div className={styles.photoWrapper}>
           <img
-            key={currentPhoto.id}
             src={getPhotoUrl(currentPhoto)}
             alt={currentPhoto.title}
             className={styles.photo}
