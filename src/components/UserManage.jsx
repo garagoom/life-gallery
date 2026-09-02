@@ -5,7 +5,7 @@ import { getUsers, createUser, updateUser, updateUserStatus, deleteUser } from '
 import { useAuth } from '../contexts/AuthContext';
 import styles from './Admin.module.css';
 
-const GENDER_LABELS = { male: '男', female: '女', other: '其他' };
+const GENDER_LABELS = { male: '男', female: '女', secret: '保密' };
 
 export default function UserManage() {
   const [users, setUsers] = useState([]);
@@ -299,7 +299,7 @@ export default function UserManage() {
             <Select allowClear placeholder="选择性别">
               <Select.Option value="male">男</Select.Option>
               <Select.Option value="female">女</Select.Option>
-              <Select.Option value="other">其他</Select.Option>
+              <Select.Option value="secret">保密</Select.Option>
             </Select>
           </Form.Item>
 

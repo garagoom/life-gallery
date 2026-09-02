@@ -1,9 +1,30 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const sharp = require('sharp');
 const { getDb, saveDb } = require('../db.cjs');
 const { generateTokens, verifyRefreshToken, authMiddleware, REFRESH_TOKEN_EXPIRES } = require('../middleware/auth.cjs');
 
 const router = express.Router();
+
+const avatarsDir = path.join(__dirname, '..', 'uploads', 'avatars');
+fs.mkdirSync(avatarsDir, { recursive: true });
+
+const avatarStorage = multer.memoryStorage();
+const avatarUpload = multer({
+  storage: avatarStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = /\.(jpg|jpeg|png|gif|webp)$/i;
+    if (allowed.test(path.extname(file.originalname))) {
+      cb(null, true);
+    } else {
+      cb(new Error('只支持 jpg/png/gif/webp 格式'));
+    }
+  },
+});
 
 // Helper to parse refresh token expiry to days
 function parseRefreshTokenExpiry() {
@@ -243,10 +264,25 @@ router.put('/profile', authMiddleware, (req, res) => {
   try {
     const { displayName, email, gender, bio } = req.body;
     const db = getDb();
-    
+
+    const stmt = db.prepare('SELECT * FROM users WHERE id = ?');
+    stmt.bind([req.user.id]);
+    if (!stmt.step()) {
+      stmt.free();
+      return res.status(404).json({ code: 404, message: '用户不存在', data: null });
+    }
+    const existing = stmt.getAsObject();
+    stmt.free();
+
     db.run(
       'UPDATE users SET display_name = ?, email = ?, gender = ?, bio = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [displayName || null, email || null, gender || null, bio || null, req.user.id]
+      [
+        displayName !== undefined ? displayName : existing.display_name,
+        email !== undefined ? email : existing.email,
+        gender !== undefined ? gender : existing.gender,
+        bio !== undefined ? bio : existing.bio,
+        req.user.id
+      ]
     );
     saveDb();
     
@@ -289,6 +325,46 @@ router.put('/password', authMiddleware, (req, res) => {
   } catch (error) {
     console.error('Change password error:', error);
     res.status(500).json({ code: 500, message: '修改密码失败', data: null });
+  }
+});
+
+router.post('/avatar', authMiddleware, avatarUpload.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ code: 400, message: '请选择图片', data: null });
+    }
+
+    const filename = `avatar-${req.user.id}-${Date.now()}.webp`;
+    const filepath = path.join(avatarsDir, filename);
+
+    await sharp(req.file.buffer)
+      .resize(256, 256, { fit: 'cover' })
+      .webp({ quality: 85 })
+      .toFile(filepath);
+
+    const avatarUrl = `/uploads/avatars/${filename}`;
+
+    const db = getDb();
+
+    const stmt = db.prepare('SELECT avatar FROM users WHERE id = ?');
+    stmt.bind([req.user.id]);
+    stmt.step();
+    const user = stmt.getAsObject();
+    stmt.free();
+
+    if (user.avatar && user.avatar.startsWith('/uploads/avatars/avatar-')) {
+      const oldPath = path.join(__dirname, '..', user.avatar);
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    }
+
+    db.run('UPDATE users SET avatar = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [avatarUrl, req.user.id]);
+    saveDb();
+
+    res.json({ code: 200, message: '头像上传成功', data: { avatar: avatarUrl } });
+  } catch (error) {
+    console.error('Avatar upload error:', error);
+    res.status(500).json({ code: 500, message: '头像上传失败', data: null });
   }
 });
 

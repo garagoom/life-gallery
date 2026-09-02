@@ -27,7 +27,7 @@ router.post('/register', (req, res) => {
       return res.status(400).json({ code: 400, message: '密码长度需在8-20个字符之间' });
     }
 
-    if (gender && !['male', 'female', 'other'].includes(gender)) {
+    if (gender && !['male', 'female', 'secret'].includes(gender)) {
       return res.status(400).json({ code: 400, message: '无效的性别值' });
     }
 

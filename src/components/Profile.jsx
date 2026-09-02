@@ -1,19 +1,22 @@
-import { useState, useEffect } from 'react';
-import { Form, Input, Button, message, Card, Avatar, Descriptions, Divider, Tabs, Typography, Radio } from 'antd';
-import { UserOutlined, LockOutlined, SaveOutlined, EditOutlined } from '@ant-design/icons';
+import { useState, useEffect, useRef } from 'react';
+import { Form, Input, Button, message, Card, Avatar, Divider, Tabs, Typography, Radio } from 'antd';
+import { UserOutlined, LockOutlined, SaveOutlined, CameraOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
+import { uploadAvatar } from '../api/auth';
 import styles from './Admin.module.css';
 
 const { Text } = Typography;
 
-const GENDER_LABELS = { male: '男摄影师', female: '女摄影师', other: '其他' };
+const GENDER_LABELS = { male: '男摄影师', female: '女摄影师', secret: '保密' };
 
 export default function Profile() {
   const { user, loginUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [avatarLoading, setAvatarLoading] = useState(false);
   const [profileForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (user) {
@@ -25,6 +28,25 @@ export default function Profile() {
       });
     }
   }, [user, profileForm]);
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      message.error('图片不能超过 5MB');
+      return;
+    }
+    setAvatarLoading(true);
+    try {
+      const data = await uploadAvatar(file);
+      loginUser({ ...user, avatar: data.avatar });
+      message.success('头像上传成功');
+    } catch (err) {
+      message.error(err.message || '头像上传失败');
+    }
+    setAvatarLoading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const handleUpdateProfile = async (values) => {
     setLoading(true);
@@ -100,7 +122,7 @@ export default function Profile() {
             <Radio.Group>
               <Radio.Button value="male">男摄影师</Radio.Button>
               <Radio.Button value="female">女摄影师</Radio.Button>
-              <Radio.Button value="other">其他</Radio.Button>
+              <Radio.Button value="secret">保密</Radio.Button>
             </Radio.Group>
           </Form.Item>
           <Form.Item name="bio" label="个人介绍">
@@ -160,17 +182,38 @@ export default function Profile() {
       </div>
       <Card style={{ maxWidth: 600 }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24 }}>
-          <Avatar
-            size={64}
-            src={user?.avatar}
-            icon={<UserOutlined />}
-            style={{ backgroundColor: 'var(--accent)' }}
-          />
+          <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => fileInputRef.current?.click()}>
+            <Avatar
+              size={64}
+              src={user?.avatar}
+              icon={<UserOutlined />}
+              style={{ backgroundColor: 'var(--accent)' }}
+            />
+            <div style={{
+              position: 'absolute', bottom: 0, right: 0,
+              width: 24, height: 24, borderRadius: '50%',
+              background: 'var(--accent)', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+              border: '2px solid var(--bg-secondary)',
+            }}>
+              <CameraOutlined style={{ color: '#fff', fontSize: 12 }} />
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={handleAvatarChange}
+            />
+          </div>
           <div style={{ marginLeft: 16 }}>
             <div style={{ fontSize: 18, fontWeight: 500 }}>{user?.displayName || user?.username}</div>
             <Text type="secondary">{roleLabels[user?.role] || user?.role}</Text>
-            {user?.gender && <Text type="secondary" style={{ marginLeft: 8 }}>· {GENDER_LABELS[user.gender]}</Text>}
+            {user?.gender && user.gender !== 'secret' && (
+              <Text type="secondary" style={{ marginLeft: 8 }}>· {GENDER_LABELS[user.gender]}</Text>
+            )}
           </div>
+          {avatarLoading && <Text type="secondary" style={{ marginLeft: 12 }}>上传中...</Text>}
         </div>
         {user?.bio && (
           <div style={{ marginBottom: 16, color: 'var(--text-secondary)', fontSize: 14 }}>

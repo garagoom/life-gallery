@@ -58,7 +58,7 @@ export default function Register() {
             <Radio.Group>
               <Radio.Button value="male">男摄影师</Radio.Button>
               <Radio.Button value="female">女摄影师</Radio.Button>
-              <Radio.Button value="other">其他</Radio.Button>
+              <Radio.Button value="secret">保密</Radio.Button>
             </Radio.Group>
           </Form.Item>
           <Form.Item name="bio">

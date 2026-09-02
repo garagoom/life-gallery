@@ -215,3 +215,13 @@ export function isTokenExpired() {
   // Add 30 second buffer to prevent edge cases
   return Date.now() >= expiration - 30000;
 }
+
+export async function uploadAvatar(file) {
+  const formData = new FormData();
+  formData.append('avatar', file);
+  const result = await request(`${API_BASE}/auth/avatar`, {
+    method: 'POST',
+    body: formData,
+  });
+  return result.data;
+}
