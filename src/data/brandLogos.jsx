@@ -8,7 +8,7 @@ const brandLogos = {
     <img src="/images/brands/nikon.png" alt="Nikon" style={{ height: 16, width: 'auto', filter: 'currentColor' }} />
   ),
   Sony: (
-    <img src="/images/brands/sony.svg" alt="Sony" style={{ height: 14, width: 'auto' }} />
+    <img src="/images/brands/sony.png" alt="Sony" style={{ height: 14, width: 'auto' }} />
   ),
   FUJIFILM: (
     <img src="/images/brands/fujifilm.svg" alt="FUJIFILM" style={{ height: 14, width: 'auto' }} />

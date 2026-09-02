@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { getRandomPhotos } from '../api/photos';
 import { getPhotoUrl } from './photos';
+import { isAuthenticated } from '../api/auth';
 
 const CACHE_KEY = 'preloadedPhotos';
 const CACHE_TS_KEY = 'preloadedPhotosTs';
@@ -11,11 +12,19 @@ let preloadPromise = null;
 function doPreload() {
   if (preloadPromise) return preloadPromise;
 
+  // Skip preload if not logged in — API will return 401 and cause redirect loop
+  if (!isAuthenticated()) {
+    return Promise.resolve([]);
+  }
+
   preloadPromise = (async () => {
     try {
       const result = await getRandomPhotos(20);
       const photos = result.data || [];
-      if (photos.length === 0) return photos;
+      if (photos.length === 0) {
+        preloadPromise = null;
+        return photos;
+      }
 
       // Preload images into browser cache
       await Promise.allSettled(
@@ -38,6 +47,7 @@ function doPreload() {
       return photos;
     } catch (err) {
       console.error('Preload failed:', err);
+      preloadPromise = null;
       return [];
     }
   })();
