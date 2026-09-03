@@ -128,8 +128,6 @@ export default function RoleManage() {
     }
   };
 
-  const getRoleByLevel = (level) => roles_dict.find(r => r.level === level);
-
   const columns = [
     {
       title: 'ID',
@@ -148,17 +146,6 @@ export default function RoleManage() {
       dataIndex: 'name',
       key: 'name',
       render: (v) => <span style={{ color: 'var(--text-secondary)' }}>{v}</span>,
-    },
-    {
-      title: '等级',
-      dataIndex: 'level',
-      key: 'level',
-      width: 120,
-      align: 'center',
-      render: (level) => {
-        const role = getRoleByLevel(level);
-        return <Tag color={role?.color || 'default'}>{role?.label || level}</Tag>;
-      },
     },
     {
       title: '用户数',
@@ -203,7 +190,9 @@ export default function RoleManage() {
         <h2 className={styles.title}>角色管理</h2>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新建角色</Button>
       </div>
-      <Table columns={columns} dataSource={roles} rowKey="id" loading={loading} scroll={{ x: 700 }} />
+      <div className={styles.tableWrap}>
+        <Table columns={columns} dataSource={roles} rowKey="id" loading={loading} pagination={false} scroll={{ x: 600 }} />
+      </div>
 
       <Modal
         title={editingRole ? '编辑角色' : '新建角色'}

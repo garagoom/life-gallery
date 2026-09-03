@@ -159,22 +159,24 @@ export default function ReviewManage() {
         </Space>
       </div>
 
-      <Table
-        columns={columns}
-        dataSource={photos}
-        rowKey="id"
-        loading={loading}
-        rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
-        pagination={{
-          current: pagination.page,
-          pageSize: pagination.pageSize,
-          total: pagination.total,
-          showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 张`,
-          onChange: (page, pageSize) => loadPhotos(page, pageSize, statusFilter),
-        }}
-        scroll={{ x: 800 }}
-      />
+      <div className={styles.tableWrap}>
+        <Table
+          columns={columns}
+          dataSource={photos}
+          rowKey="id"
+          loading={loading}
+          rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
+          pagination={{
+            current: pagination.page,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 张`,
+            onChange: (page, pageSize) => loadPhotos(page, pageSize, statusFilter),
+          }}
+          scroll={{ x: 800 }}
+        />
+      </div>
     </div>
   );
 }

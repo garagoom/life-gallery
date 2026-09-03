@@ -164,16 +164,18 @@ export default function MenuManage() {
         <h2 className={styles.title}>菜单管理</h2>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => handleAdd()}>新建菜单</Button>
       </div>
-      <Table
-        columns={columns}
-        dataSource={menus}
-        rowKey="id"
-        loading={loading}
-        pagination={false}
-        scroll={{ x: 800 }}
-        childrenColumnName="children"
-        expandable={{ defaultExpandAllRows: true }}
-      />
+      <div className={styles.tableWrap}>
+        <Table
+          columns={columns}
+          dataSource={menus}
+          rowKey="id"
+          loading={loading}
+          pagination={false}
+          scroll={{ x: 800 }}
+          childrenColumnName="children"
+          expandable={{ defaultExpandAllRows: true }}
+        />
+      </div>
 
       <Modal
         title={editingMenu ? '编辑菜单' : '新建菜单'}

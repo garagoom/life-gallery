@@ -26,9 +26,9 @@ async function request(url, options = {}) {
   return json;
 }
 
-export async function getUsers() {
-  const result = await request(`${API_BASE}/users`);
-  return result.data;
+export async function getUsers({ page = 1, pageSize = 20 } = {}) {
+  const result = await request(`${API_BASE}/users?page=${page}&pageSize=${pageSize}`);
+  return { data: result.data, pagination: result.pagination };
 }
 
 export async function createUser(data) {

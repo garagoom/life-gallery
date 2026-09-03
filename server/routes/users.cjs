@@ -16,7 +16,15 @@ const DEFAULT_AVATARS = {
 router.get('/', (req, res) => {
   try {
     const db = getDb();
-    const stmt = db.prepare('SELECT id, username, display_name, email, avatar, gender, bio, role, status, created_at, updated_at FROM users ORDER BY created_at DESC');
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize) || 20));
+    const offset = (page - 1) * pageSize;
+
+    const countResult = db.exec('SELECT COUNT(*) as count FROM users');
+    const total = countResult[0] ? countResult[0].values[0][0] : 0;
+
+    const stmt = db.prepare('SELECT id, username, display_name, email, avatar, gender, bio, role, status, created_at, updated_at FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?');
+    stmt.bind([pageSize, offset]);
     
     const users = [];
     while (stmt.step()) {
@@ -24,7 +32,12 @@ router.get('/', (req, res) => {
     }
     stmt.free();
     
-    res.json({ code: 200, message: 'success', data: users });
+    res.json({
+      code: 200,
+      message: 'success',
+      data: users,
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
+    });
   } catch (error) {
     console.error('Get users error:', error);
     res.status(500).json({ code: 500, message: '获取用户列表失败', data: null });
@@ -51,7 +64,7 @@ router.post('/', (req, res) => {
       return res.status(400).json({ code: 400, message: '密码长度需在8-20个字符之间', data: null });
     }
     
-    if (!['admin', 'editor', 'viewer'].includes(role)) {
+    if (!['admin', 'module_admin', 'creator', 'viewer'].includes(role)) {
       return res.status(400).json({ code: 400, message: '无效的角色', data: null });
     }
     

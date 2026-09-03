@@ -9,6 +9,7 @@ import styles from './Admin.module.css';
 export default function UserManage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 20, total: 0 });
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [form] = Form.useForm();
@@ -18,11 +19,12 @@ export default function UserManage() {
   const [deletingId, setDeletingId] = useState(null);
   const [statusLoadingId, setStatusLoadingId] = useState(null);
 
-  const loadUsers = async () => {
+  const loadUsers = async (page = 1, pageSize = 20) => {
     setLoading(true);
     try {
-      const data = await getUsers();
-      setUsers(data);
+      const result = await getUsers({ page, pageSize });
+      setUsers(result.data);
+      setPagination(result.pagination);
     } catch (error) {
       message.error(error.message || '加载用户失败');
     } finally {
@@ -226,14 +228,23 @@ export default function UserManage() {
         </Button>
       </div>
 
-      <Table
-        columns={columns}
-        dataSource={users}
-        rowKey="id"
-        loading={loading}
-        pagination={false}
-        scroll={{ x: 900 }}
-      />
+      <div className={styles.tableWrap}>
+        <Table
+          columns={columns}
+          dataSource={users}
+          rowKey="id"
+          loading={loading}
+          scroll={{ x: 900 }}
+          pagination={{
+            current: pagination.page,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 个用户`,
+            onChange: (page, pageSize) => loadUsers(page, pageSize),
+          }}
+        />
+      </div>
 
       <Modal
         title={editingUser ? '编辑用户' : '添加用户'}

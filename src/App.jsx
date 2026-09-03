@@ -112,37 +112,27 @@ function App() {
           } />
           <Route path="/photography/admin" element={
             <ProtectedRoute requiredRole="editor">
-              <div style={{ height: '100%', overflow: 'auto', paddingBottom: '80px' }}>
-                <Admin />
-              </div>
+              <Admin />
             </ProtectedRoute>
           } />
           <Route path="/photography/admin/review" element={
             <ProtectedRoute requiredRole="admin">
-              <div style={{ height: '100%', overflow: 'auto', paddingBottom: '80px' }}>
-                <ReviewManage />
-              </div>
+              <ReviewManage />
             </ProtectedRoute>
           } />
           <Route path="/photography/admin/users" element={
             <ProtectedRoute requiredRole="admin">
-              <div style={{ height: '100%', overflow: 'auto', paddingBottom: '80px' }}>
-                <UserManage />
-              </div>
+              <UserManage />
             </ProtectedRoute>
           } />
           <Route path="/photography/admin/roles" element={
             <ProtectedRoute requiredRole="admin">
-              <div style={{ height: '100%', overflow: 'auto', paddingBottom: '80px' }}>
-                <RoleManage />
-              </div>
+              <RoleManage />
             </ProtectedRoute>
           } />
           <Route path="/photography/admin/menus" element={
             <ProtectedRoute requiredRole="admin">
-              <div style={{ height: '100%', overflow: 'auto', paddingBottom: '80px' }}>
-                <MenuManage />
-              </div>
+              <MenuManage />
             </ProtectedRoute>
           } />
           <Route path="/photography/profile" element={

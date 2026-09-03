@@ -373,34 +373,36 @@ export default function Admin() {
           </Form>
         </div>
 
-        <Table
-          columns={columns}
-          dataSource={photos}
-          rowKey="id"
-          loading={loading}
-          rowSelection={{
-            selectedRowKeys,
-            onChange: setSelectedRowKeys,
-          }}
-          pagination={{
-            current: pagination.page,
-            pageSize: pagination.pageSize,
-            total: pagination.total,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total) => `共 ${total} 张照片`,
-            pageSizeOptions: ['10', '20', '50'],
-            sizeChangerText: '条/页',
-            quickGoText: '跳至',
-            itemRender: (current, type, originalElement) => {
-              if (type === 'prev') return <a>上一页</a>;
-              if (type === 'next') return <a>下一页</a>;
-              return originalElement;
-            },
-          }}
-          onChange={handleTableChange}
-          scroll={{ x: 900 }}
-        />
+        <div className={styles.tableWrap}>
+          <Table
+            columns={columns}
+            dataSource={photos}
+            rowKey="id"
+            loading={loading}
+            rowSelection={{
+              selectedRowKeys,
+              onChange: setSelectedRowKeys,
+            }}
+            pagination={{
+              current: pagination.page,
+              pageSize: pagination.pageSize,
+              total: pagination.total,
+              showSizeChanger: true,
+              showQuickJumper: true,
+              showTotal: (total) => `共 ${total} 张照片`,
+              pageSizeOptions: ['10', '20', '50'],
+              sizeChangerText: '条/页',
+              quickGoText: '跳至',
+              itemRender: (current, type, originalElement) => {
+                if (type === 'prev') return <a>上一页</a>;
+                if (type === 'next') return <a>下一页</a>;
+                return originalElement;
+              },
+            }}
+            onChange={handleTableChange}
+            scroll={{ x: 900 }}
+          />
+        </div>
 
         {/* Single Upload Modal */}
         <Modal
