@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { UserOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { getPhotoUrl, getThumbnailUrl } from '../data/photos';
 import { prefetchImage, isImageLoaded } from '../utils/imageCache';
@@ -7,9 +7,11 @@ import styles from './RetroLightbox.module.css';
 
 export default function RetroLightbox({ photo, photos, onClose, onNavigate }) {
   const [displayPhoto, setDisplayPhoto] = useState(photo);
-  const [displaySrc, setDisplaySrc] = useState(
-    () => (photo && isImageLoaded(getPhotoUrl(photo)) ? getPhotoUrl(photo) : getThumbnailUrl(photo))
-  );
+  const [thumbSrc, setThumbSrc] = useState(() => (photo ? getThumbnailUrl(photo) : ''));
+  const [fullSrc, setFullSrc] = useState('');
+  const [fullShown, setFullShown] = useState(false);
+  const photosRef = useRef(photos);
+  photosRef.current = photos;
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Escape') onClose();
@@ -30,28 +32,37 @@ export default function RetroLightbox({ photo, photos, onClose, onNavigate }) {
     if (!photo) return;
     let cancelled = false;
     const full = getPhotoUrl(photo);
+    const thumb = getThumbnailUrl(photo);
 
-    const apply = () => {
+    setDisplayPhoto(photo);
+    setThumbSrc(thumb || full);
+    setFullSrc('');
+    setFullShown(false);
+
+    const reveal = () => {
       if (cancelled) return;
-      setDisplayPhoto(photo);
-      setDisplaySrc(full);
+      setFullSrc(full);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (!cancelled) setFullShown(true);
+        });
+      });
     };
 
-    if (isImageLoaded(full)) apply();
-    else prefetchImage(full).then(apply);
+    if (isImageLoaded(full)) reveal();
+    else prefetchImage(full).then(reveal);
 
-    if (photos?.length) {
-      const idx = photos.findIndex((p) => p.id === photo.id);
+    const list = photosRef.current;
+    if (list?.length) {
+      const idx = list.findIndex((p) => p.id === photo.id);
       if (idx >= 0) {
-        const prev = photos[(idx - 1 + photos.length) % photos.length];
-        const next = photos[(idx + 1) % photos.length];
-        prefetchImage(getPhotoUrl(prev));
-        prefetchImage(getPhotoUrl(next));
+        prefetchImage(getPhotoUrl(list[(idx - 1 + list.length) % list.length]));
+        prefetchImage(getPhotoUrl(list[(idx + 1) % list.length]));
       }
     }
 
     return () => { cancelled = true; };
-  }, [photo, photos]);
+  }, [photo]);
 
   if (!photo) return null;
 
@@ -90,12 +101,22 @@ export default function RetroLightbox({ photo, photos, onClose, onNavigate }) {
               className={styles.photoFrame}
               style={{ transform: `rotate(${shown.rotation || 0}deg)` }}
             >
-              <img
-                src={displaySrc}
-                alt={shown.title}
-                className={styles.image}
-                decoding="async"
-              />
+              <div className={styles.imageSlot}>
+                <img
+                  src={thumbSrc}
+                  alt=""
+                  className={fullSrc ? styles.imageThumbFill : styles.image}
+                  decoding="async"
+                />
+                {fullSrc && (
+                  <img
+                    src={fullSrc}
+                    alt={shown.title}
+                    className={`${styles.image} ${fullShown ? styles.imageReveal : styles.imageHidden}`}
+                    decoding="async"
+                  />
+                )}
+              </div>
               <ExifInfo photo={shown} />
             </div>
           </div>

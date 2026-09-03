@@ -56,7 +56,7 @@ export default function HomePage({ onPhotoClick, isPaused, initialPhotos = [] })
       prefetchImage(nextUrl).then(() => {
         setCurrentIndex((prev) => (prev === currentIndex ? nextIdx : prev));
       });
-    }, 500);
+    }, 300);
     return () => clearInterval(interval);
   }, [isPaused, currentIndex]);
 
