@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Spin } from 'antd';
 import { getPhotos } from '../api/photos';
 import { fallbackPhotos } from '../data/photos';
@@ -9,6 +9,7 @@ import styles from './Portfolio.module.css';
 
 export default function Portfolio() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -20,8 +21,8 @@ export default function Portfolio() {
   const pageSize = 20;
 
   const handlePhotoClick = useCallback((photo) => {
-    navigate(`/photography/photo/${photo.id}`);
-  }, [navigate]);
+    navigate(`/photography/photo/${photo.id}`, { state: { background: location } });
+  }, [navigate, location]);
 
   useEffect(() => {
     const loadInitial = async () => {

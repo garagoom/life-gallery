@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { getPhotoById } from '../api/photos';
 import { getPhotoUrl } from '../data/photos';
 import { getCachedPhoto, cachePhoto } from '../utils/imageCache';
@@ -7,11 +7,24 @@ import { extractHistogram } from '../utils/extractHistogram';
 import CreatorCard from './CreatorCard';
 import styles from './PhotoDetail.module.css';
 
-export default function PhotoDetail() {
+export default function PhotoDetail({ overlay = false }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const overlayRef = useRef(null);
   const [photo, setPhoto] = useState(() => getCachedPhoto(id));
   const [loading, setLoading] = useState(!getCachedPhoto(id));
+  const [histogramData, setHistogramData] = useState(null);
+  const [creatorCardOpen, setCreatorCardOpen] = useState(false);
+  const imgRef = useRef(null);
+
+  const handleBack = useCallback(() => {
+    if (overlay || location.state?.background) {
+      navigate(-1);
+      return;
+    }
+    navigate('/photography/portfolio');
+  }, [overlay, location.state, navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,16 +48,34 @@ export default function PhotoDetail() {
   }, [id]);
 
   useEffect(() => {
+    setHistogramData(null);
+    overlayRef.current?.scrollTo(0, 0);
+  }, [id]);
+
+  useEffect(() => {
     const handleKey = (e) => {
-      if (e.key === 'Escape') navigate('/photography/portfolio');
+      if (e.key === 'Escape') handleBack();
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [navigate]);
+  }, [handleBack]);
+
+  useEffect(() => {
+    if (!photo || histogramData) return;
+    const img = imgRef.current;
+    if (!img || !img.complete || !img.naturalWidth) return;
+    setHistogramData(extractHistogram(img));
+  }, [photo, histogramData]);
+
+  const handleImgLoad = useCallback(() => {
+    if (histogramData) return;
+    const img = imgRef.current;
+    if (img) setHistogramData(extractHistogram(img));
+  }, [histogramData]);
 
   if (loading) {
     return (
-      <div className={styles.page}>
+      <div ref={overlayRef} className={overlay ? `${styles.page} ${styles.overlay}` : styles.page}>
         <div className={styles.loading}>加载中...</div>
       </div>
     );
@@ -52,7 +83,7 @@ export default function PhotoDetail() {
 
   if (!photo) {
     return (
-      <div className={styles.page}>
+      <div ref={overlayRef} className={overlay ? `${styles.page} ${styles.overlay}` : styles.page}>
         <div className={styles.notFound}>照片不存在</div>
       </div>
     );
@@ -101,29 +132,12 @@ export default function PhotoDetail() {
     photo.altitude != null ? { label: '海拔', value: `${Math.round(photo.altitude)}m` } : null,
   ].filter(Boolean) : [];
 
-  const [histogramData, setHistogramData] = useState(null);
-  const [creatorCardOpen, setCreatorCardOpen] = useState(false);
-  const imgRef = useRef(null);
-
-  useEffect(() => {
-    if (!photo || histogramData) return;
-    const img = imgRef.current;
-    if (!img || !img.complete || !img.naturalWidth) return;
-    setHistogramData(extractHistogram(img));
-  }, [photo, histogramData]);
-
-  const handleImgLoad = useCallback(() => {
-    if (histogramData) return;
-    const img = imgRef.current;
-    if (img) setHistogramData(extractHistogram(img));
-  }, [histogramData]);
-
   return (
-    <div className={styles.page}>
+    <div ref={overlayRef} className={overlay ? `${styles.page} ${styles.overlay}` : styles.page}>
       <div className={styles.topNav}>
         <button
           className={styles.navBtn}
-          onClick={() => navigate('/photography/portfolio')}
+          onClick={handleBack}
         >
           返回
         </button>

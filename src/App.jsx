@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import FloatingMenu from './components/FloatingMenu';
 import HomePage from './components/HomePage';
@@ -26,6 +26,89 @@ function FloatingMenuWrapper() {
   return <FloatingMenu />;
 }
 
+function AppRoutes({ handlePhotosLoaded, handlePhotoClick, isPaused, photos }) {
+  const location = useLocation();
+  const background = location.state?.background;
+
+  return (
+    <>
+      <Routes location={background || location}>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/loading" element={<Loading onPhotosLoaded={handlePhotosLoaded} />} />
+
+        <Route path="/photography/home" element={
+          <ProtectedRoute>
+            <HomePage
+              onPhotoClick={handlePhotoClick}
+              isPaused={isPaused}
+              initialPhotos={photos}
+            />
+          </ProtectedRoute>
+        } />
+        <Route path="/photography/portfolio" element={
+          <ProtectedRoute>
+            <div style={{ height: '100%', overflow: 'auto', paddingBottom: '80px' }}>
+              <Portfolio />
+            </div>
+          </ProtectedRoute>
+        } />
+        <Route path="/photography/photo/:id" element={
+          <ProtectedRoute>
+            <div style={{ height: '100%', overflow: 'auto' }}>
+              <PhotoDetail />
+            </div>
+          </ProtectedRoute>
+        } />
+        <Route path="/photography/admin" element={
+          <ProtectedRoute>
+            <Admin />
+          </ProtectedRoute>
+        } />
+        <Route path="/photography/admin/review" element={
+          <ProtectedRoute>
+            <ReviewManage />
+          </ProtectedRoute>
+        } />
+        <Route path="/photography/admin/users" element={
+          <ProtectedRoute>
+            <UserManage />
+          </ProtectedRoute>
+        } />
+        <Route path="/photography/admin/roles" element={
+          <ProtectedRoute>
+            <RoleManage />
+          </ProtectedRoute>
+        } />
+        <Route path="/photography/admin/menus" element={
+          <ProtectedRoute>
+            <MenuManage />
+          </ProtectedRoute>
+        } />
+        <Route path="/photography/profile" element={
+          <ProtectedRoute>
+            <Profile />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/" element={<Navigate to="/photography/home" replace />} />
+        <Route path="/photography" element={<Navigate to="/photography/home" replace />} />
+        <Route path="*" element={<Navigate to="/photography/home" replace />} />
+      </Routes>
+
+      {background && (
+        <Routes>
+          <Route path="/photography/photo/:id" element={
+            <ProtectedRoute>
+              <PhotoDetail overlay />
+            </ProtectedRoute>
+          } />
+        </Routes>
+      )}
+    </>
+  );
+}
+
 function initPhotos() {
   try {
     const cached = sessionStorage.getItem('preloadedPhotos');
@@ -42,13 +125,11 @@ function App() {
   const [lightboxPhoto, setLightboxPhoto] = useState(null);
   const [isPaused, setIsPaused] = useState(false);
   const [photos, setPhotos] = useState(init.current.photos);
-  const [photosLoaded, setPhotosLoaded] = useState(init.current.loaded);
 
   const handlePhotosLoaded = useCallback((loadedPhotos) => {
     if (loadedPhotos && loadedPhotos.length > 0) {
       setPhotos(loadedPhotos);
     }
-    setPhotosLoaded(true);
   }, []);
 
   const handlePhotoClick = useCallback((photo) => {
@@ -75,69 +156,12 @@ function App() {
   return (
     <BrowserRouter>
       <div style={{ height: '100%' }}>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/loading" element={<Loading onPhotosLoaded={handlePhotosLoaded} />} />
-
-          <Route path="/photography/home" element={
-            <ProtectedRoute>
-              <HomePage
-                onPhotoClick={handlePhotoClick}
-                isPaused={isPaused}
-                initialPhotos={photos}
-              />
-            </ProtectedRoute>
-          } />
-          <Route path="/photography/portfolio" element={
-            <ProtectedRoute>
-              <div style={{ height: '100%', overflow: 'auto', paddingBottom: '80px' }}>
-                <Portfolio />
-              </div>
-            </ProtectedRoute>
-          } />
-          <Route path="/photography/photo/:id" element={
-            <ProtectedRoute>
-              <div style={{ height: '100%', overflow: 'auto' }}>
-                <PhotoDetail />
-              </div>
-            </ProtectedRoute>
-          } />
-          <Route path="/photography/admin" element={
-            <ProtectedRoute>
-              <Admin />
-            </ProtectedRoute>
-          } />
-          <Route path="/photography/admin/review" element={
-            <ProtectedRoute>
-              <ReviewManage />
-            </ProtectedRoute>
-          } />
-          <Route path="/photography/admin/users" element={
-            <ProtectedRoute>
-              <UserManage />
-            </ProtectedRoute>
-          } />
-          <Route path="/photography/admin/roles" element={
-            <ProtectedRoute>
-              <RoleManage />
-            </ProtectedRoute>
-          } />
-          <Route path="/photography/admin/menus" element={
-            <ProtectedRoute>
-              <MenuManage />
-            </ProtectedRoute>
-          } />
-          <Route path="/photography/profile" element={
-            <ProtectedRoute>
-              <Profile />
-            </ProtectedRoute>
-          } />
-
-          <Route path="/" element={<Navigate to="/photography/home" replace />} />
-          <Route path="/photography" element={<Navigate to="/photography/home" replace />} />
-          <Route path="*" element={<Navigate to="/photography/home" replace />} />
-        </Routes>
+        <AppRoutes
+          handlePhotosLoaded={handlePhotosLoaded}
+          handlePhotoClick={handlePhotoClick}
+          isPaused={isPaused}
+          photos={photos}
+        />
 
         <FloatingMenuWrapper />
 

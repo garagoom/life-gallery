@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="12" fill="#8b7355"/>
+  <text
+    x="32"
+    y="30"
+    text-anchor="middle"
+    font-family="Georgia, 'Palatino Linotype', Palatino, 'Times New Roman', serif"
+    font-style="italic"
+    font-weight="600"
+    font-size="22"
+    fill="#f5f0e8"
+  >Life</text>
+  <rect x="18" y="35" width="28" height="0.8" fill="#f5f0e8" opacity="0.55"/>
+  <text
+    x="32"
+    y="50"
+    text-anchor="middle"
+    font-family="Georgia, 'Palatino Linotype', Palatino, 'Times New Roman', serif"
+    font-style="italic"
+    font-weight="500"
+    font-size="9"
+    letter-spacing="1.6"
+    fill="#f5f0e8"
+  >Gallery</text>
+</svg>
