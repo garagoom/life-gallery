@@ -444,8 +444,8 @@ router.post('/batch-delete', authMiddleware, requireCreator, (req, res) => {
   }
 });
 
-// GET /api/photos/review - List all photos for review (admin only)
-router.get('/review', authMiddleware, requireAdmin, (req, res) => {
+// GET /api/photos/review - List all photos for review (module_admin+)
+router.get('/review', authMiddleware, requireModuleAdmin, (req, res) => {
   try {
     const db = getDb();
     const { review_status, page = 1, pageSize = 20 } = req.query;
@@ -491,7 +491,7 @@ router.get('/review', authMiddleware, requireAdmin, (req, res) => {
 });
 
 // PUT /api/photos/batch-review - Batch approve/reject
-router.post('/batch-review', authMiddleware, requireAdmin, (req, res) => {
+router.post('/batch-review', authMiddleware, requireModuleAdmin, (req, res) => {
   try {
     const { ids, review_status } = req.body;
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -740,7 +740,7 @@ router.delete('/:id', authMiddleware, requireCreator, (req, res) => {
 });
 
 // PUT /api/photos/:id/review - Approve or reject a photo
-router.put('/:id/review', authMiddleware, requireAdmin, (req, res) => {
+router.put('/:id/review', authMiddleware, requireModuleAdmin, (req, res) => {
   try {
     const { review_status } = req.body;
     if (![1, 2].includes(review_status)) {
