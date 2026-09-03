@@ -112,6 +112,15 @@
   color: var(--accent);
 }
 
+.themeToggleLabel {
+  flex: 1;
+  color: inherit !important;
+}
+
 .themeToggle:hover {
   background: rgba(139, 115, 85, 0.1);
+}
+
+.themeToggle :global(.ant-switch-checked) {
+  background-color: var(--accent) !important;
 }

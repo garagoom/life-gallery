@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import FloatingMenu from './components/FloatingMenu';
-import ThemeToggle from './components/ThemeToggle';
 import HomePage from './components/HomePage';
 import Portfolio from './components/Portfolio';
 import RetroLightbox from './components/RetroLightbox';
@@ -25,12 +24,6 @@ function FloatingMenuWrapper() {
   const { pathname } = useLocation();
   if (hideMenuPaths.some(p => pathname.startsWith(p))) return null;
   return <FloatingMenu />;
-}
-
-function ThemeToggleWrapper() {
-  const { pathname } = useLocation();
-  if (hideMenuPaths.some(p => pathname.startsWith(p))) return null;
-  return <ThemeToggle />;
 }
 
 function initPhotos() {
@@ -147,7 +140,6 @@ function App() {
         </Routes>
 
         <FloatingMenuWrapper />
-        <ThemeToggleWrapper />
 
         {lightboxPhoto && (
           <RetroLightbox

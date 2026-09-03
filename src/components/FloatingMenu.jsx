@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Popover, Dropdown, Avatar, Menu, Divider, Typography } from 'antd';
+import { Popover, Dropdown, Avatar, Menu, Divider, Typography, Switch } from 'antd';
 import {
   CameraOutlined,
   UserOutlined,
@@ -9,8 +9,11 @@ import {
   HomeOutlined,
   PictureOutlined,
   AppstoreOutlined,
+  BulbOutlined,
+  BulbFilled,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { logout } from '../api/auth';
 import { getMyMenus } from '../api/menus';
 import { iconMap } from '../utils/icons';
@@ -91,6 +94,8 @@ export default function FloatingMenu() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loginUser } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === 'dark';
   const [loggingOut, setLoggingOut] = useState(false);
   const [modules, setModules] = useState(fallbackModules);
   const [pos, setPos] = useState(() => {
@@ -304,6 +309,27 @@ export default function FloatingMenu() {
                 <Text>{user.displayName || user.username}</Text>
               </div>
             </Dropdown>
+          </div>
+          <div
+            className={styles.themeToggle}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleTheme();
+            }}
+          >
+            {isDark ? <BulbFilled /> : <BulbOutlined />}
+            <Text className={styles.themeToggleLabel}>
+              {isDark ? '深色模式' : '浅色模式'}
+            </Text>
+            <span
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Switch
+                size="small"
+                checked={isDark}
+                onChange={toggleTheme}
+              />
+            </span>
           </div>
         </>
       )}
