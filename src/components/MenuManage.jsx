@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Table, Button, Modal, Form, Input, InputNumber, Select, Switch, Space, message, Popconfirm } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { useDict } from '../contexts/DictContext';
 import styles from './Admin.module.css';
 
 export default function MenuManage() {
@@ -11,6 +12,9 @@ export default function MenuManage() {
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const { getDict } = useDict();
+  const menuTypeDict = getDict('menu_type');
+  const visibleDict = getDict('visible');
 
   const getAuthHeaders = () => ({
     'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
@@ -118,9 +122,8 @@ export default function MenuManage() {
       width: 80,
       align: 'center',
       render: (val) => {
-        const colorMap = { module: 'blue', menu: 'green', button: 'orange' };
-        const labelMap = { module: '模块', menu: '菜单', button: '按钮' };
-        return <span style={{ color: `var(--${colorMap[val] || 'text'})` }}>{labelMap[val] || val}</span>;
+        const item = menuTypeDict.find(d => d.value === val);
+        return item ? <span style={{ color: `var(--${item.color})` }}>{item.label}</span> : val;
       },
     },
     {
@@ -129,7 +132,10 @@ export default function MenuManage() {
       key: 'visible',
       width: 70,
       align: 'center',
-      render: (val) => <Switch checked={val === 1} disabled size="small" />,
+      render: (val) => {
+        const item = visibleDict.find(d => d.value === String(val));
+        return <Switch checked={val === 1} disabled size="small" />;
+      },
     },
     {
       title: '图标',
@@ -214,13 +220,17 @@ export default function MenuManage() {
           </Form.Item>
           <Form.Item name="type" label="类型" initialValue="menu">
             <Select>
-              <Select.Option value="module">模块</Select.Option>
-              <Select.Option value="menu">菜单</Select.Option>
-              <Select.Option value="button">按钮</Select.Option>
+              {menuTypeDict.map(d => (
+                <Select.Option key={d.value} value={d.value}>{d.label}</Select.Option>
+              ))}
             </Select>
           </Form.Item>
-          <Form.Item name="visible" label="可见" initialValue={1} valuePropName="checked">
-            <Switch checkedChildren="显示" unCheckedChildren="隐藏" />
+          <Form.Item name="visible" label="可见" initialValue={1}>
+            <Select>
+              {visibleDict.map(d => (
+                <Select.Option key={d.value} value={Number(d.value)}>{d.label}</Select.Option>
+              ))}
+            </Select>
           </Form.Item>
           <Form.Item name="icon" label="图标">
             <Input placeholder="输入图标名" />
