@@ -94,7 +94,7 @@ export function AuthProvider({ children }) {
 
   const hasRole = useCallback((role) => {
     if (!user) return false;
-    const roleHierarchy = { admin: 3, editor: 2, viewer: 1 };
+    const roleHierarchy = { admin: 4, module_admin: 3, creator: 2, viewer: 1 };
     return (roleHierarchy[user.role] || 0) >= (roleHierarchy[role] || 0);
   }, [user]);
 

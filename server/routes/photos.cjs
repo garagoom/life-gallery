@@ -6,7 +6,8 @@ const sharp = require('sharp');
 const exifReader = require('exif-reader');
 const { getDb, saveDb } = require('../db.cjs');
 const { authMiddleware } = require('../middleware/auth.cjs');
-const { requireEditor } = require('../middleware/permission.cjs');
+const { requireRole, requireAdmin } = require('../middleware/permission.cjs');
+const requireCreator = requireRole('module_admin', 'creator');
 
 const router = express.Router();
 
@@ -274,7 +275,13 @@ router.get('/random', (req, res) => {
     
     // Get random photos using ORDER BY RANDOM()
     const actualCount = Math.min(count, total);
-    const stmt = db.prepare(`SELECT * FROM photos ORDER BY RANDOM() LIMIT ?`);
+    const stmt = db.prepare(`
+      SELECT p.*, u.display_name AS uploader_display_name, u.avatar AS uploader_avatar, u.bio AS uploader_bio
+      FROM photos p
+      LEFT JOIN users u ON p.uploaded_by = u.username
+      WHERE p.review_status = 1
+      ORDER BY RANDOM() LIMIT ?
+    `);
     stmt.bind([actualCount]);
     
     const photos = [];
@@ -291,7 +298,7 @@ router.get('/random', (req, res) => {
 });
 
 // GET /api/photos - with search and pagination
-router.get('/', (req, res) => {
+router.get('/', authMiddleware, (req, res) => {
   try {
     const db = getDb();
     const { category, title, dateFrom, dateTo, page = 1, pageSize = 20 } = req.query;
@@ -299,23 +306,30 @@ router.get('/', (req, res) => {
     let whereConditions = [];
     let params = [];
     
+    // Permission: non-admin users can only see their own photos
+    if (req.user && req.user.role !== 'admin') {
+      whereConditions.push('p.uploaded_by = ?');
+      params.push(req.user.username);
+      whereConditions.push('p.review_status = 1');
+    }
+    
     if (category) {
-      whereConditions.push('category = ?');
+      whereConditions.push('p.category = ?');
       params.push(category);
     }
     
     if (title) {
-      whereConditions.push('title LIKE ?');
+      whereConditions.push('p.title LIKE ?');
       params.push(`%${title}%`);
     }
     
     if (dateFrom) {
-      whereConditions.push('date >= ?');
+      whereConditions.push('p.date >= ?');
       params.push(dateFrom);
     }
     
     if (dateTo) {
-      whereConditions.push('date <= ?');
+      whereConditions.push('p.date <= ?');
       params.push(dateTo);
     }
     
@@ -323,7 +337,7 @@ router.get('/', (req, res) => {
       ? 'WHERE ' + whereConditions.join(' AND ') 
       : '';
     
-    const countStmt = db.prepare(`SELECT COUNT(*) as total FROM photos ${whereClause}`);
+    const countStmt = db.prepare(`SELECT COUNT(*) as total FROM photos p ${whereClause}`);
     if (params.length > 0) countStmt.bind(params);
     countStmt.step();
     const total = countStmt.getAsObject().total;
@@ -331,7 +345,10 @@ router.get('/', (req, res) => {
     
     const offset = (parseInt(page) - 1) * parseInt(pageSize);
     const dataStmt = db.prepare(
-      `SELECT * FROM photos ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+      `       SELECT p.*, u.display_name AS uploader_display_name, u.avatar AS uploader_avatar, u.bio AS uploader_bio
+       FROM photos p
+       LEFT JOIN users u ON p.uploaded_by = u.username
+       ${whereClause} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`
     );
     dataStmt.bind([...params, parseInt(pageSize), offset]);
     
@@ -353,11 +370,125 @@ router.get('/', (req, res) => {
   }
 });
 
+// DELETE /api/photos/batch - Batch delete
+router.post('/batch-delete', authMiddleware, requireCreator, (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return error(res, '请选择要删除的照片', 400);
+    }
+
+    const db = getDb();
+    let deletedCount = 0;
+
+    for (const id of ids) {
+      const stmt = db.prepare('SELECT * FROM photos WHERE id = ?');
+      stmt.bind([parseInt(id)]);
+      if (stmt.step()) {
+        const photo = stmt.getAsObject();
+        // Permission: non-admin users can only delete their own photos
+        if (req.user.role !== 'admin' && photo.uploaded_by !== req.user.username) {
+          stmt.free();
+          continue;
+        }
+        const uploadPath = path.join(uploadsDir, photo.filename);
+        const thumbPath = path.join(thumbnailsDir, photo.thumbnail);
+        try { if (fs.existsSync(uploadPath)) fs.unlinkSync(uploadPath); } catch (e) {}
+        try { if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath); } catch (e) {}
+        db.run('DELETE FROM photos WHERE id = ?', [parseInt(id)]);
+        deletedCount++;
+      }
+      stmt.free();
+    }
+
+    saveDb();
+    success(res, { deletedCount }, `成功删除 ${deletedCount} 张照片`);
+  } catch (err) {
+    console.error('Batch delete error:', err);
+    error(res, '批量删除失败: ' + err.message);
+  }
+});
+
+// GET /api/photos/review - List all photos for review (admin only)
+router.get('/review', authMiddleware, requireAdmin, (req, res) => {
+  try {
+    const db = getDb();
+    const { review_status, page = 1, pageSize = 20 } = req.query;
+
+    let whereConditions = [];
+    let params = [];
+
+    if (review_status !== undefined && review_status !== '') {
+      whereConditions.push('p.review_status = ?');
+      params.push(parseInt(review_status));
+    }
+
+    const whereClause = whereConditions.length > 0
+      ? 'WHERE ' + whereConditions.join(' AND ')
+      : '';
+
+    const countStmt = db.prepare(`SELECT COUNT(*) as total FROM photos p ${whereClause}`);
+    if (params.length > 0) countStmt.bind(params);
+    countStmt.step();
+    const total = countStmt.getAsObject().total;
+    countStmt.free();
+
+    const offset = (parseInt(page) - 1) * parseInt(pageSize);
+    const dataStmt = db.prepare(
+      `SELECT p.*, u.display_name AS uploader_display_name, u.avatar AS uploader_avatar
+       FROM photos p
+       LEFT JOIN users u ON p.uploaded_by = u.username
+       ${whereClause} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`
+    );
+    dataStmt.bind([...params, parseInt(pageSize), offset]);
+
+    const photos = [];
+    while (dataStmt.step()) {
+      photos.push(dataStmt.getAsObject());
+    }
+    dataStmt.free();
+
+    paginate(res, photos, { page: parseInt(page), pageSize: parseInt(pageSize), total, totalPages: Math.ceil(total / parseInt(pageSize)) });
+  } catch (err) {
+    console.error('Get review photos error:', err);
+    error(res, '获取审核列表失败');
+  }
+});
+
+// PUT /api/photos/batch-review - Batch approve/reject
+router.post('/batch-review', authMiddleware, requireAdmin, (req, res) => {
+  try {
+    const { ids, review_status } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return error(res, '请选择照片', 400);
+    }
+    if (![1, 2].includes(review_status)) {
+      return error(res, '无效的审核状态', 400);
+    }
+
+    const db = getDb();
+    for (const id of ids) {
+      db.run('UPDATE photos SET review_status = ? WHERE id = ?', [review_status, parseInt(id)]);
+    }
+    saveDb();
+
+    success(res, { count: ids.length }, review_status === 1 ? `已通过 ${ids.length} 张照片` : `已拒绝 ${ids.length} 张照片`);
+  } catch (err) {
+    console.error('Batch review error:', err);
+    error(res, '批量审核失败');
+  }
+});
+
 // GET /api/photos/:id
 router.get('/:id', (req, res) => {
   try {
     const db = getDb();
-    const stmt = db.prepare('SELECT * FROM photos WHERE id = ?');
+    const stmt = db.prepare(`
+      SELECT p.*, u.display_name AS uploader_display_name, u.avatar AS uploader_avatar, u.bio AS uploader_bio
+      FROM photos p
+      LEFT JOIN users u ON p.uploaded_by = u.username
+      WHERE p.id = ?
+    `);
     stmt.bind([parseInt(req.params.id)]);
     
     if (stmt.step()) {
@@ -387,7 +518,7 @@ router.get('/:id', (req, res) => {
 });
 
 // POST /api/photos - Single upload
-router.post('/', authMiddleware, requireEditor, upload.single('file'), async (req, res) => {
+router.post('/', authMiddleware, requireCreator, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return error(res, '请选择要上传的文件', 400);
@@ -396,20 +527,22 @@ router.post('/', authMiddleware, requireEditor, upload.single('file'), async (re
     const { title, date, category } = req.body;
     const photoData = await processPhoto(req.file, title, date, category);
     const uploadedBy = req.user ? req.user.username : null;
+    // Admin uploads auto-approved, others pending
+    const reviewStatus = req.user?.role === 'admin' ? 1 : 0;
 
     const db = getDb();
     db.run(
       `INSERT INTO photos (title, filename, thumbnail, date, category, rotation, 
        camera_make, camera_model, exposure_time, f_number, iso, focal_length,
-       software, lens_model, white_balance, metering_mode, flash, color_space, uploaded_by) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       software, lens_model, white_balance, metering_mode, flash, color_space, uploaded_by, review_status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         photoData.title, photoData.filename, photoData.thumbnail,
         photoData.date, photoData.category, photoData.rotation,
         photoData.cameraMake, photoData.cameraModel, photoData.exposureTime,
         photoData.fNumber, photoData.iso, photoData.focalLength,
         photoData.software, photoData.lensModel, photoData.whiteBalance,
-        photoData.meteringMode, photoData.flash, photoData.colorSpace, uploadedBy,
+        photoData.meteringMode, photoData.flash, photoData.colorSpace, uploadedBy, reviewStatus,
       ]
     );
     saveDb();
@@ -427,7 +560,7 @@ router.post('/', authMiddleware, requireEditor, upload.single('file'), async (re
 });
 
 // POST /api/photos/batch - Batch upload
-router.post('/batch', authMiddleware, requireEditor, upload.array('files', 100), async (req, res) => {
+router.post('/batch', authMiddleware, requireCreator, upload.array('files', 100), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return error(res, '请选择要上传的文件', 400);
@@ -439,6 +572,7 @@ router.post('/batch', authMiddleware, requireEditor, upload.array('files', 100),
     let successCount = 0;
     let failCount = 0;
     const uploadedBy = req.user ? req.user.username : null;
+    const reviewStatus = req.user?.role === 'admin' ? 1 : 0;
 
     for (const file of req.files) {
       try {
@@ -447,15 +581,15 @@ router.post('/batch', authMiddleware, requireEditor, upload.array('files', 100),
         db.run(
           `INSERT INTO photos (title, filename, thumbnail, date, category, rotation,
            camera_make, camera_model, exposure_time, f_number, iso, focal_length,
-           software, lens_model, white_balance, metering_mode, flash, color_space, uploaded_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           software, lens_model, white_balance, metering_mode, flash, color_space, uploaded_by, review_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             photoData.title, photoData.filename, photoData.thumbnail,
             photoData.date, photoData.category, photoData.rotation,
             photoData.cameraMake, photoData.cameraModel, photoData.exposureTime,
             photoData.fNumber, photoData.iso, photoData.focalLength,
             photoData.software, photoData.lensModel, photoData.whiteBalance,
-            photoData.meteringMode, photoData.flash, photoData.colorSpace, uploadedBy,
+            photoData.meteringMode, photoData.flash, photoData.colorSpace, uploadedBy, reviewStatus,
           ]
         );
 
@@ -482,7 +616,7 @@ router.post('/batch', authMiddleware, requireEditor, upload.array('files', 100),
 });
 
 // PUT /api/photos/:id
-router.put('/:id', authMiddleware, requireEditor, (req, res) => {
+router.put('/:id', authMiddleware, requireCreator, (req, res) => {
   try {
     const db = getDb();
     const { title, date, category } = req.body;
@@ -497,6 +631,11 @@ router.put('/:id', authMiddleware, requireEditor, (req, res) => {
     
     const existing = checkStmt.getAsObject();
     checkStmt.free();
+    
+    // Permission: non-admin users can only edit their own photos
+    if (req.user.role !== 'admin' && existing.uploaded_by !== req.user.username) {
+      return error(res, '无权编辑此照片', 403);
+    }
     
     db.run(
       'UPDATE photos SET title = ?, date = ?, category = ? WHERE id = ?',
@@ -523,7 +662,7 @@ router.put('/:id', authMiddleware, requireEditor, (req, res) => {
 });
 
 // DELETE /api/photos/:id
-router.delete('/:id', authMiddleware, requireEditor, (req, res) => {
+router.delete('/:id', authMiddleware, requireCreator, (req, res) => {
   try {
     const db = getDb();
     
@@ -537,6 +676,11 @@ router.delete('/:id', authMiddleware, requireEditor, (req, res) => {
     
     const photo = checkStmt.getAsObject();
     checkStmt.free();
+    
+    // Permission: non-admin users can only delete their own photos
+    if (req.user.role !== 'admin' && photo.uploaded_by !== req.user.username) {
+      return error(res, '无权删除此照片', 403);
+    }
     
     const uploadPath = path.join(uploadsDir, photo.filename);
     const thumbPath = path.join(thumbnailsDir, photo.thumbnail);
@@ -554,37 +698,30 @@ router.delete('/:id', authMiddleware, requireEditor, (req, res) => {
   }
 });
 
-// DELETE /api/photos/batch - Batch delete
-router.post('/batch-delete', authMiddleware, requireEditor, (req, res) => {
+// PUT /api/photos/:id/review - Approve or reject a photo
+router.put('/:id/review', authMiddleware, requireAdmin, (req, res) => {
   try {
-    const { ids } = req.body;
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      return error(res, '请选择要删除的照片', 400);
+    const { review_status } = req.body;
+    if (![1, 2].includes(review_status)) {
+      return error(res, '无效的审核状态', 400);
     }
 
     const db = getDb();
-    let deletedCount = 0;
-
-    for (const id of ids) {
-      const stmt = db.prepare('SELECT * FROM photos WHERE id = ?');
-      stmt.bind([parseInt(id)]);
-      if (stmt.step()) {
-        const photo = stmt.getAsObject();
-        const uploadPath = path.join(uploadsDir, photo.filename);
-        const thumbPath = path.join(thumbnailsDir, photo.thumbnail);
-        try { if (fs.existsSync(uploadPath)) fs.unlinkSync(uploadPath); } catch (e) {}
-        try { if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath); } catch (e) {}
-        db.run('DELETE FROM photos WHERE id = ?', [parseInt(id)]);
-        deletedCount++;
-      }
-      stmt.free();
+    const checkStmt = db.prepare('SELECT id FROM photos WHERE id = ?');
+    checkStmt.bind([parseInt(req.params.id)]);
+    if (!checkStmt.step()) {
+      checkStmt.free();
+      return error(res, '照片不存在', 404);
     }
+    checkStmt.free();
 
+    db.run('UPDATE photos SET review_status = ? WHERE id = ?', [review_status, parseInt(req.params.id)]);
     saveDb();
-    success(res, { deletedCount }, `成功删除 ${deletedCount} 张照片`);
+
+    success(res, null, review_status === 1 ? '已通过审核' : '已拒绝');
   } catch (err) {
-    console.error('Batch delete error:', err);
-    error(res, '批量删除失败: ' + err.message);
+    console.error('Review error:', err);
+    error(res, '审核操作失败');
   }
 });
 

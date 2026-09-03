@@ -9,6 +9,7 @@ const usersRouter = require('./routes/users.cjs');
 const rolesRouter = require('./routes/roles.cjs');
 const menusRouter = require('./routes/menus.cjs');
 const registerRouter = require('./routes/register.cjs');
+const dictRouter = require('./routes/dict.cjs');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -48,6 +49,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/roles', rolesRouter);
 app.use('/api/menus', menusRouter);
+app.use('/api/dict', dictRouter);
 app.use('/api', registerRouter);
 
 // Serve frontend in production

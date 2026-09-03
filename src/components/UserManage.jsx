@@ -3,9 +3,8 @@ import { Table, Button, Modal, Form, Input, Select, Switch, Space, Popconfirm, T
 import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined } from '@ant-design/icons';
 import { getUsers, createUser, updateUser, updateUserStatus, deleteUser } from '../api/users';
 import { useAuth } from '../contexts/AuthContext';
+import { useDict } from '../contexts/DictContext';
 import styles from './Admin.module.css';
-
-const GENDER_LABELS = { male: '男', female: '女', secret: '保密' };
 
 export default function UserManage() {
   const [users, setUsers] = useState([]);
@@ -14,6 +13,7 @@ export default function UserManage() {
   const [editingUser, setEditingUser] = useState(null);
   const [form] = Form.useForm();
   const { user: currentUser } = useAuth();
+  const { getDict, getLabel, getColor } = useDict();
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [statusLoadingId, setStatusLoadingId] = useState(null);
@@ -119,17 +119,8 @@ export default function UserManage() {
     }
   };
 
-  const roleColors = {
-    admin: 'red',
-    editor: 'blue',
-    viewer: 'default'
-  };
-
-  const roleLabels = {
-    admin: '管理员',
-    editor: '编辑者',
-    viewer: '查看者'
-  };
+  const roles = getDict('role');
+  const genders = getDict('gender');
 
   const columns = [
     {
@@ -153,7 +144,7 @@ export default function UserManage() {
       key: 'gender',
       width: 80,
       align: 'center',
-      render: (g) => g ? GENDER_LABELS[g] : '-',
+      render: (g) => g ? getLabel('gender', g) : '-',
     },
     {
       title: '简介',
@@ -176,7 +167,7 @@ export default function UserManage() {
       width: 100,
       align: 'center',
       render: (role) => (
-        <Tag color={roleColors[role]}>{roleLabels[role]}</Tag>
+        <Tag color={getColor('role', role)}>{getLabel('role', role)}</Tag>
       ),
     },
     {
@@ -299,9 +290,9 @@ export default function UserManage() {
 
           <Form.Item name="gender" label="性别">
             <Select allowClear placeholder="选择性别">
-              <Select.Option value="male">男</Select.Option>
-              <Select.Option value="female">女</Select.Option>
-              <Select.Option value="secret">保密</Select.Option>
+              {genders.map(g => (
+                <Select.Option key={g.value} value={g.value}>{g.label}</Select.Option>
+              ))}
             </Select>
           </Form.Item>
 
@@ -311,9 +302,9 @@ export default function UserManage() {
           
           <Form.Item name="role" label="角色" rules={[{ required: true }]}>
             <Select>
-              <Select.Option value="admin">管理员</Select.Option>
-              <Select.Option value="editor">编辑者</Select.Option>
-              <Select.Option value="viewer">查看者</Select.Option>
+              {roles.map(r => (
+                <Select.Option key={r.value} value={r.value}>{r.label}</Select.Option>
+              ))}
             </Select>
           </Form.Item>
         </Form>

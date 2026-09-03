@@ -8,9 +8,11 @@ const DEFAULT_AVATARS = {
   female: '/images/avatars/female.svg',
 };
 
+const ALLOWED_ROLES = ['creator', 'viewer'];
+
 router.post('/register', (req, res) => {
   try {
-    const { username, password, displayName, email, gender, bio } = req.body;
+    const { username, password, displayName, email, gender, bio, role } = req.body;
     if (!username || !password) {
       return res.status(400).json({ code: 400, message: '用户名和密码不能为空' });
     }
@@ -31,6 +33,8 @@ router.post('/register', (req, res) => {
       return res.status(400).json({ code: 400, message: '无效的性别值' });
     }
 
+    const userRole = ALLOWED_ROLES.includes(role) ? role : 'creator';
+
     const db = getDb();
 
     const existing = db.exec(`SELECT id FROM users WHERE username = ?`, [username])[0];
@@ -39,13 +43,13 @@ router.post('/register', (req, res) => {
     }
 
     const hashedPassword = bcrypt.hashSync(password, 10);
-    const viewerRole = db.exec(`SELECT id FROM roles WHERE name = 'viewer'`)[0];
-    const roleId = viewerRole && viewerRole.values.length > 0 ? viewerRole.values[0][0] : 1;
+    const roleRow = db.exec(`SELECT id FROM roles WHERE name = ?`, [userRole])[0];
+    const roleId = roleRow && roleRow.values.length > 0 ? roleRow.values[0][0] : 3;
     const avatar = DEFAULT_AVATARS[gender] || DEFAULT_AVATARS.male;
 
     db.run(
       `INSERT INTO users (username, password, display_name, email, gender, bio, avatar, role, role_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [username, hashedPassword, displayName || username, email || null, gender || null, bio || null, avatar, 'viewer', roleId]
+      [username, hashedPassword, displayName || username, email || null, gender || null, bio || null, avatar, userRole, roleId]
     );
     saveDb();
 

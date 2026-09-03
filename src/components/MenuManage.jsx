@@ -12,12 +12,15 @@ export default function MenuManage() {
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
+  const getAuthHeaders = () => ({
+    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+  });
+
   const fetchMenus = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('accessToken');
       const res = await fetch('/api/menus', {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: getAuthHeaders()
       });
       const data = await res.json();
       if (data.code === 200) {
@@ -47,10 +50,9 @@ export default function MenuManage() {
   const handleDelete = async (id) => {
     setDeletingId(id);
     try {
-      const token = localStorage.getItem('accessToken');
       const res = await fetch(`/api/menus/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: getAuthHeaders()
       });
       const data = await res.json();
       if (data.code === 200) {
@@ -71,13 +73,12 @@ export default function MenuManage() {
     setSubmitting(true);
     try {
       const values = await form.validateFields();
-      const token = localStorage.getItem('accessToken');
       const url = editingMenu ? `/api/menus/${editingMenu.id}` : '/api/menus';
       const method = editingMenu ? 'PUT' : 'POST';
       const res = await fetch(url, {
         method,
         headers: {
-          'Authorization': `Bearer ${token}`,
+          ...getAuthHeaders(),
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(values)

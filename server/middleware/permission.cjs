@@ -1,6 +1,7 @@
 const ROLE_HIERARCHY = {
-  admin: 3,
-  editor: 2,
+  admin: 4,
+  module_admin: 3,
+  creator: 2,
   viewer: 1
 };
 
@@ -25,8 +26,12 @@ function requireAdmin(req, res, next) {
   return requireRole('admin')(req, res, next);
 }
 
-function requireEditor(req, res, next) {
-  return requireRole('editor')(req, res, next);
+function requireModuleAdmin(req, res, next) {
+  return requireRole('module_admin')(req, res, next);
 }
 
-module.exports = { requireRole, requireAdmin, requireEditor, ROLE_HIERARCHY };
+function requireCreator(req, res, next) {
+  return requireRole('creator')(req, res, next);
+}
+
+module.exports = { requireRole, requireAdmin, requireModuleAdmin, requireCreator, ROLE_HIERARCHY };

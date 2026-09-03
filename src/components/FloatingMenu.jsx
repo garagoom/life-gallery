@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Popover, Dropdown, Avatar, Menu, Badge, Divider, Typography } from 'antd';
-import { 
-  CameraOutlined, 
-  UserOutlined, 
-  LogoutOutlined, 
+import { Popover, Dropdown, Avatar, Menu, Divider, Typography } from 'antd';
+import {
+  CameraOutlined,
+  UserOutlined,
+  LogoutOutlined,
   SettingOutlined,
   HomeOutlined,
   TeamOutlined,
@@ -12,48 +12,87 @@ import {
   SafetyOutlined,
   MenuOutlined,
   AppstoreOutlined,
-  BulbOutlined,
-  BulbFilled
+  AuditOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
 import { logout } from '../api/auth';
+import { getMyMenus } from '../api/menus';
 import styles from './FloatingMenu.module.css';
 
 const { Text } = Typography;
 
-const modules = [
+const iconMap = {
+  CameraOutlined: <CameraOutlined />,
+  UserOutlined: <UserOutlined />,
+  LogoutOutlined: <LogoutOutlined />,
+  SettingOutlined: <SettingOutlined />,
+  HomeOutlined: <HomeOutlined />,
+  TeamOutlined: <TeamOutlined />,
+  PictureOutlined: <PictureOutlined />,
+  SafetyOutlined: <SafetyOutlined />,
+  MenuOutlined: <MenuOutlined />,
+  AppstoreOutlined: <AppstoreOutlined />,
+  AuditOutlined: <AuditOutlined />,
+};
+
+const fallbackModules = [
   {
     key: 'photography',
     label: '摄影',
     icon: <CameraOutlined />,
-    prefix: '/photography',
+    path: '/photography',
     children: [
       { key: 'home', label: '首页', path: '/photography/home', icon: <HomeOutlined /> },
       { key: 'portfolio', label: '作品集', path: '/photography/portfolio', icon: <PictureOutlined /> },
-      { key: 'admin', label: '管理', path: '/photography/admin', icon: <SettingOutlined />, requiredRole: 'editor' },
-    ]
-  },
-  {
-    key: 'system',
-    label: '系统管理',
-    icon: <AppstoreOutlined />,
-    prefix: '/photography/admin/users',
-    requiredRole: 'admin',
-    children: [
-      { key: 'users', label: '用户管理', path: '/photography/admin/users', icon: <TeamOutlined /> },
-      { key: 'roles', label: '角色管理', path: '/photography/admin/roles', icon: <SafetyOutlined /> },
-      { key: 'menus', label: '菜单管理', path: '/photography/admin/menus', icon: <MenuOutlined /> },
+      { key: 'admin', label: '管理', path: '/photography/admin', icon: <SettingOutlined /> },
     ]
   },
 ];
 
+function buildTree(list) {
+  const tree = [];
+  const map = {};
+  list.forEach(item => {
+    map[item.id] = { ...item, children: [] };
+  });
+  list.forEach(item => {
+    if (item.parent_id && map[item.parent_id]) {
+      map[item.parent_id].children.push(map[item.id]);
+    } else {
+      tree.push(map[item.id]);
+    }
+  });
+  return tree;
+}
+
+function resolveIcon(iconName) {
+  if (!iconName) return <AppstoreOutlined />;
+  return iconMap[iconName] || <AppstoreOutlined />;
+}
+
+function resolveMenuTree(apiTree) {
+  return apiTree.map(node => ({
+    ...node,
+    icon: resolveIcon(node.icon),
+    path: node.path || undefined,
+    children: node.children ? resolveMenuTree(node.children) : undefined,
+  }));
+}
+
 export default function FloatingMenu() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, loginUser, hasRole } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { user, loginUser } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [modules, setModules] = useState(fallbackModules);
+
+  useEffect(() => {
+    if (!user) return;
+    getMyMenus().then(res => {
+      const tree = resolveMenuTree(res.data || []);
+      if (tree.length > 0) setModules(tree);
+    }).catch(() => {});
+  }, [user]);
 
   if (!user) {
     navigate('/login', { replace: true });
@@ -62,17 +101,17 @@ export default function FloatingMenu() {
 
   const getCurrentModule = () => {
     const path = location.pathname;
-    // Check system module first (more specific path)
-    if (path.startsWith('/photography/admin/users') || 
-        path.startsWith('/photography/admin/roles') || 
-        path.startsWith('/photography/admin/menus')) {
-      return modules.find(m => m.key === 'system');
-    }
-    // Then check other modules
+    // First: exact match on children paths (more specific)
     for (const mod of modules) {
-      if (path.startsWith(mod.prefix) && mod.key !== 'system') {
-        return mod;
+      if (mod.children) {
+        for (const child of mod.children) {
+          if (child.path && path === child.path) return mod;
+        }
       }
+    }
+    // Second: match on module prefix (less specific)
+    for (const mod of modules) {
+      if (mod.path && path.startsWith(mod.path)) return mod;
     }
     return modules[0];
   };
@@ -81,14 +120,11 @@ export default function FloatingMenu() {
 
   const getCurrentPage = () => {
     const path = location.pathname;
-    for (const mod of modules) {
-      if (path.startsWith(mod.prefix)) {
-        const pagePath = path.replace(mod.prefix, '');
-        const child = mod.children.find(c => c.path === `${mod.prefix}${pagePath}`);
-        return child?.key || 'home';
-      }
+    if (!currentModule || !currentModule.children) return '';
+    for (const child of currentModule.children) {
+      if (child.path && path === child.path) return child.key;
     }
-    return 'home';
+    return currentModule.children[0]?.key || '';
   };
 
   const currentPage = getCurrentPage();
@@ -102,23 +138,24 @@ export default function FloatingMenu() {
     loginUser(null);
   };
 
-  const moduleMenuItems = modules
-    .filter(mod => !mod.requiredRole || hasRole(mod.requiredRole))
-    .map(mod => ({
-      key: mod.key,
-      icon: mod.icon,
-      label: mod.label,
-      onClick: () => navigate(mod.key === 'system' ? '/photography/admin/users' : mod.prefix + '/home'),
-    }));
+  const moduleMenuItems = modules.map(mod => ({
+    key: mod.key,
+    icon: mod.icon,
+    label: mod.label,
+    onClick: () => {
+      const target = mod.path
+        ? (mod.children?.[0]?.path || mod.path)
+        : (mod.children?.[0]?.path || '/');
+      navigate(target);
+    },
+  }));
 
-  const pageMenuItems = currentModule.children
-    .filter(child => !child.requiredRole || hasRole(child.requiredRole))
-    .map(child => ({
-      key: child.key,
-      icon: child.icon,
-      label: child.label,
-      onClick: () => navigate(child.path),
-    }));
+  const pageMenuItems = (currentModule?.children || []).map(child => ({
+    key: child.key,
+    icon: child.icon,
+    label: child.label,
+    onClick: () => child.path && navigate(child.path),
+  }));
 
   const userMenuItems = [
     {
@@ -166,8 +203,9 @@ export default function FloatingMenu() {
           <div className={styles.section}>
             <Dropdown menu={{ items: userMenuItems }} trigger={['click']} placement="topRight">
               <div className={styles.userItem}>
-                <Avatar 
-                  icon={<UserOutlined />} 
+                <Avatar
+                  src={user.avatar}
+                  icon={<UserOutlined />}
                   size="small"
                   style={{ backgroundColor: 'var(--accent)' }}
                 />
@@ -178,14 +216,6 @@ export default function FloatingMenu() {
         </>
       )}
 
-      <Divider style={{ margin: '4px 0' }} />
-
-      <div className={styles.section}>
-        <div className={styles.themeToggle} onClick={toggleTheme}>
-          {theme === 'light' ? <BulbOutlined /> : <BulbFilled />}
-          <Text>{theme === 'light' ? '深色模式' : '浅色模式'}</Text>
-        </div>
-      </div>
     </div>
   );
 
@@ -198,13 +228,11 @@ export default function FloatingMenu() {
         overlayClassName={styles.popover}
         arrow={false}
       >
-        <Badge dot={!!user} offset={[-2, 2]}>
-          <div className={styles.mainButton}>
-            <div className={styles.moduleIcon}>
-              {currentModule.icon}
-            </div>
+        <div className={styles.mainButton}>
+          <div className={styles.moduleIcon}>
+            {currentModule.icon}
           </div>
-        </Badge>
+        </div>
       </Popover>
     </div>
   );

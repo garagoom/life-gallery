@@ -2,16 +2,16 @@ import { useState, useEffect } from 'react';
 import { Form, Input, Button, message, Card, Avatar, Divider, Tabs, Typography, Radio, Upload } from 'antd';
 import { UserOutlined, LockOutlined, SaveOutlined, CameraOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
+import { useDict } from '../contexts/DictContext';
 import { uploadAvatar } from '../api/auth';
 import AvatarCropper from './AvatarCropper';
 import styles from './Admin.module.css';
 
 const { Text } = Typography;
 
-const GENDER_LABELS = { male: '男', female: '女', secret: '保密' };
-
 export default function Profile() {
   const { user, loginUser } = useAuth();
+  const { getDict, getLabel } = useDict();
   const [loading, setLoading] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(false);
@@ -117,8 +117,6 @@ export default function Profile() {
     setPasswordLoading(false);
   };
 
-  const roleLabels = { admin: '管理员', editor: '编辑者', viewer: '查看者' };
-
   const tabItems = [
     {
       key: 'info',
@@ -136,9 +134,9 @@ export default function Profile() {
           </Form.Item>
           <Form.Item name="gender" label="性别">
             <Radio.Group>
-              <Radio.Button value="male">男</Radio.Button>
-              <Radio.Button value="female">女</Radio.Button>
-              <Radio.Button value="secret">保密</Radio.Button>
+              {getDict('gender').map(g => (
+                <Radio.Button key={g.value} value={g.value}>{g.label}</Radio.Button>
+              ))}
             </Radio.Group>
           </Form.Item>
           <Form.Item name="bio" label="个人介绍">
@@ -196,7 +194,8 @@ export default function Profile() {
       <div className={styles.header}>
         <h2 className={styles.title}>个人信息</h2>
       </div>
-      <Card style={{ maxWidth: 600 }}>
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <Card style={{ maxWidth: 600, width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24 }}>
           <Upload
             showUploadList={false}
@@ -223,9 +222,9 @@ export default function Profile() {
           </Upload>
           <div style={{ marginLeft: 16 }}>
             <div style={{ fontSize: 18, fontWeight: 500 }}>{user?.displayName || user?.username}</div>
-            <Text type="secondary">{roleLabels[user?.role] || user?.role}</Text>
+            <Text type="secondary">{getLabel('role', user?.role)}</Text>
             {user?.gender && user.gender !== 'secret' && (
-              <Text type="secondary" style={{ marginLeft: 8 }}>· {GENDER_LABELS[user.gender]}</Text>
+              <Text type="secondary" style={{ marginLeft: 8 }}>· {getLabel('gender', user.gender)}</Text>
             )}
           </div>
           {avatarLoading && <Text type="secondary" style={{ marginLeft: 12 }}>上传中...</Text>}
@@ -238,6 +237,7 @@ export default function Profile() {
         <Divider />
         <Tabs items={tabItems} />
       </Card>
+      </div>
       <AvatarCropper
         open={cropOpen}
         imageSrc={cropImage}

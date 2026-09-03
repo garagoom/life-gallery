@@ -4,6 +4,7 @@ import { ConfigProvider, theme as antTheme } from 'antd'
 import App from './App.jsx'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
+import { DictProvider } from './contexts/DictContext'
 import './index.css'
 
 function ThemedConfigProvider({ children }) {
@@ -28,6 +29,14 @@ function ThemedConfigProvider({ children }) {
       controlItemBgActive: isDark ? '#333' : '#ebe5d9',
       controlItemBgHover: isDark ? '#2e2e2e' : '#f0ebe3',
     },
+    components: {
+      Button: {
+        colorPrimary: isDark ? '#b8a080' : '#8b7355',
+        colorPrimaryHover: isDark ? '#d4b896' : '#a08060',
+        colorPrimaryActive: isDark ? '#a08060' : '#7a6245',
+        colorTextLightSolid: isDark ? '#1a1a1a' : '#ffffff',
+      },
+    },
   }), [isDark]);
 
   return (
@@ -42,7 +51,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <ThemeProvider>
       <ThemedConfigProvider>
         <AuthProvider>
-          <App />
+          <DictProvider>
+            <App />
+          </DictProvider>
         </AuthProvider>
       </ThemedConfigProvider>
     </ThemeProvider>

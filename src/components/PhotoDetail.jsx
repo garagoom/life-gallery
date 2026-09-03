@@ -4,6 +4,7 @@ import { getPhotoById } from '../api/photos';
 import { getPhotoUrl } from '../data/photos';
 import { getCachedPhoto, cachePhoto } from '../utils/imageCache';
 import { extractHistogram } from '../utils/extractHistogram';
+import CreatorCard from './CreatorCard';
 import styles from './PhotoDetail.module.css';
 
 export default function PhotoDetail() {
@@ -94,6 +95,7 @@ export default function PhotoDetail() {
   ].filter(item => item.value);
 
   const [histogramData, setHistogramData] = useState(null);
+  const [creatorCardOpen, setCreatorCardOpen] = useState(false);
   const imgRef = useRef(null);
 
   useEffect(() => {
@@ -136,6 +138,32 @@ export default function PhotoDetail() {
         )}
 
         <h1 className={styles.title}>{photo.title || 'Untitled'}</h1>
+
+        {(photo.uploader_display_name || photo.uploaded_by) && (
+          <div
+            className={styles.creatorLine}
+            onClick={() => setCreatorCardOpen(true)}
+            style={{ cursor: 'pointer' }}
+          >
+            {photo.uploader_avatar ? (
+              <img src={photo.uploader_avatar} alt="" className={styles.creatorAvatar} />
+            ) : (
+              <div className={styles.creatorAvatarPlaceholder}>
+                {(photo.uploader_display_name || photo.uploaded_by || '').slice(0, 1)}
+              </div>
+            )}
+            <span className={styles.creatorName}>{photo.uploader_display_name || photo.uploaded_by}</span>
+          </div>
+        )}
+
+        {creatorCardOpen && (
+          <CreatorCard
+            name={photo.uploader_display_name || photo.uploaded_by}
+            avatar={photo.uploader_avatar}
+            bio={photo.uploader_bio}
+            onClose={() => setCreatorCardOpen(false)}
+          />
+        )}
 
         {photo.date && (
           <div className={styles.dateLine}>

@@ -64,12 +64,12 @@ export default function RetroLightbox({ photo, photos, onClose, onNavigate }) {
             </div>
           </div>
           
-          {(photo.uploaded_by || photo.date) && (
+          {(photo.uploader_display_name || photo.uploaded_by || photo.date) && (
             <div className={styles.meta}>
-              {photo.uploaded_by && (
+              {(photo.uploader_display_name || photo.uploaded_by) && (
                 <div className={styles.metaLine}>
                   <UserOutlined className={styles.metaIcon} />
-                  <span>{photo.uploaded_by}</span>
+                  <span>{photo.uploader_display_name || photo.uploaded_by}</span>
                 </div>
               )}
               {photo.date && (

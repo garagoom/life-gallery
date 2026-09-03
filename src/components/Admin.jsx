@@ -7,11 +7,13 @@ import dayjs from 'dayjs';
 import { getPhotos, uploadPhoto, batchUploadPhotos, updatePhoto, deletePhoto, batchDeletePhotos } from '../api/photos';
 import { getPhotoUrl, getThumbnailUrl } from '../data/photos';
 import { useAuth } from '../contexts/AuthContext';
+import { useDict } from '../contexts/DictContext';
 import styles from './Admin.module.css';
 
 export default function Admin() {
   const navigate = useNavigate();
   const { hasRole } = useAuth();
+  const { getColor, getLabel } = useDict();
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -272,6 +274,16 @@ export default function Admin() {
       },
     },
     {
+      title: '审核',
+      key: 'review_status',
+      width: 80,
+      render: (_, record) => {
+        const colorMap = { orange: '#fa8c16', green: '#52c41a', red: '#ff4d4f' };
+        const color = getColor('review_status', record.review_status);
+        return <span style={{ color: colorMap[color] || undefined, fontWeight: 500 }}>{getLabel('review_status', record.review_status)}</span>;
+      },
+    },
+    {
       title: '操作',
       key: 'action',
       width: 100,
@@ -302,9 +314,9 @@ export default function Admin() {
         <div className={styles.header}>
           <h2 className={styles.title}>照片管理</h2>
           <Space>
-            {hasRole('admin') && (
-              <Button icon={<TeamOutlined />} onClick={() => navigate('/photography/admin/users')}>
-                用户管理
+            {hasRole('module_admin') && (
+              <Button icon={<TeamOutlined />} onClick={() => navigate('/photography/admin/review')}>
+                审核管理
               </Button>
             )}
             {selectedRowKeys.length > 0 && (

@@ -3,6 +3,7 @@ const API_BASE = '/api';
 // Token storage keys
 const ACCESS_TOKEN_KEY = 'accessToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
+const SESSION_ID_KEY = 'sessionId';
 const USER_KEY = 'user';
 
 // Flag to prevent multiple refresh attempts
@@ -65,7 +66,7 @@ async function request(url, options = {}) {
       const refreshResult = await fetch(`${API_BASE}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken })
+        body: JSON.stringify({ refreshToken, sessionId: localStorage.getItem(SESSION_ID_KEY) })
       });
       
       const refreshJson = await refreshResult.json();
@@ -102,8 +103,11 @@ async function request(url, options = {}) {
   
   // Handle other errors
   if (json.code === 401) {
-    clearAuth();
-    window.location.href = '/login';
+    // Don't redirect if already on login/register page
+    if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/register')) {
+      clearAuth();
+      window.location.href = '/login';
+    }
     throw new Error(json.message);
   }
   
@@ -117,21 +121,33 @@ async function request(url, options = {}) {
 function clearAuth() {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem(SESSION_ID_KEY);
   localStorage.removeItem(USER_KEY);
 }
 
-export async function login(username, password) {
-  const result = await request(`${API_BASE}/auth/login`, {
+export async function login(username, password, force = false) {
+  const result = await fetch(`${API_BASE}/auth/login`, {
     method: 'POST',
-    body: JSON.stringify({ username, password })
-  });
-  
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password, force })
+  }).then(r => r.json());
+
+  // Session conflict — return 409 for caller to handle
+  if (result.code === 409) {
+    return result;
+  }
+
+  if (result.code !== 200) {
+    throw new Error(result.message || '登录失败');
+  }
+
   if (result.data?.accessToken) {
     localStorage.setItem(ACCESS_TOKEN_KEY, result.data.accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, result.data.refreshToken);
+    localStorage.setItem(SESSION_ID_KEY, result.data.sessionId || '');
     localStorage.setItem(USER_KEY, JSON.stringify(result.data.user));
   }
-  
+
   return result.data;
 }
 

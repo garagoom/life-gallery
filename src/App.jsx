@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import FloatingMenu from './components/FloatingMenu';
+import ThemeToggle from './components/ThemeToggle';
 import HomePage from './components/HomePage';
 import Portfolio from './components/Portfolio';
 import RetroLightbox from './components/RetroLightbox';
@@ -12,6 +13,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import UserManage from './components/UserManage';
 import RoleManage from './components/RoleManage';
 import MenuManage from './components/MenuManage';
+import ReviewManage from './components/ReviewManage';
 import Profile from './components/Profile';
 import PhotoDetail from './components/PhotoDetail';
 import { fallbackPhotos } from './data/photos';
@@ -23,6 +25,12 @@ function FloatingMenuWrapper() {
   const { pathname } = useLocation();
   if (hideMenuPaths.some(p => pathname.startsWith(p))) return null;
   return <FloatingMenu />;
+}
+
+function ThemeToggleWrapper() {
+  const { pathname } = useLocation();
+  if (hideMenuPaths.some(p => pathname.startsWith(p))) return null;
+  return <ThemeToggle />;
 }
 
 function initPhotos() {
@@ -109,6 +117,13 @@ function App() {
               </div>
             </ProtectedRoute>
           } />
+          <Route path="/photography/admin/review" element={
+            <ProtectedRoute requiredRole="admin">
+              <div style={{ height: '100%', overflow: 'auto', paddingBottom: '80px' }}>
+                <ReviewManage />
+              </div>
+            </ProtectedRoute>
+          } />
           <Route path="/photography/admin/users" element={
             <ProtectedRoute requiredRole="admin">
               <div style={{ height: '100%', overflow: 'auto', paddingBottom: '80px' }}>
@@ -144,6 +159,7 @@ function App() {
         </Routes>
 
         <FloatingMenuWrapper />
+        <ThemeToggleWrapper />
 
         {lightboxPhoto && (
           <RetroLightbox

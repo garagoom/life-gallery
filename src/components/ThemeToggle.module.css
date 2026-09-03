@@ -1,0 +1,18 @@
+.container {
+  position: fixed;
+  top: 16px;
+  right: 24px;
+  z-index: 1000;
+}
+
+.container[data-theme="dark"] :global(.ant-switch-checked) {
+  background-color: #b8a080 !important;
+}
+
+.container[data-theme="dark"] :global(.ant-switch) {
+  background-color: #555 !important;
+}
+
+.container[data-theme="light"] :global(.ant-switch-checked) {
+  background-color: #8b7355 !important;
+}

@@ -130,3 +130,35 @@ export async function batchDeletePhotos(ids) {
   });
   return result;
 }
+
+export async function getReviewPhotos(params = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.review_status !== undefined && params.review_status !== '') searchParams.append('review_status', params.review_status);
+  if (params.page) searchParams.append('page', params.page);
+  if (params.pageSize) searchParams.append('pageSize', params.pageSize);
+  const queryString = searchParams.toString();
+  const url = `${API_BASE}/photos/review${queryString ? '?' + queryString : ''}`;
+  const result = await request(url);
+  return {
+    data: result.data || [],
+    pagination: result.pagination || { page: 1, pageSize: 20, total: 0, totalPages: 0 }
+  };
+}
+
+export async function reviewPhoto(id, review_status) {
+  const result = await request(`${API_BASE}/photos/${id}/review`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ review_status })
+  });
+  return result;
+}
+
+export async function batchReviewPhotos(ids, review_status) {
+  const result = await request(`${API_BASE}/photos/batch-review`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids, review_status })
+  });
+  return result;
+}

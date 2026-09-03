@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Form, Input, Button, message, Typography } from 'antd';
+import { Form, Input, Button, message, Typography, Modal } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { login } from '../api/auth';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,13 +17,30 @@ export default function Login() {
   // Start preloading images in background while user is on login page
   useImagePreloader();
 
+  const doLogin = async (username, password, force = false) => {
+    const result = await login(username, password, force);
+
+    // 409: session conflict
+    if (result?.code === 409) {
+      Modal.confirm({
+        title: '账号已在其他设备登录',
+        content: '是否踢出对方并在此设备登录？',
+        okText: '确认登录',
+        cancelText: '取消',
+        onOk: () => doLogin(username, password, true),
+      });
+      return;
+    }
+
+    loginUser(result.user);
+    message.success('登录成功');
+    navigate('/loading', { replace: true });
+  };
+
   const handleSubmit = async (values) => {
     setLoading(true);
     try {
-      const data = await login(values.username, values.password);
-      loginUser(data.user);
-      message.success('登录成功');
-      navigate('/loading', { replace: true });
+      await doLogin(values.username, values.password);
     } catch (error) {
       message.error(error.message || '登录失败');
     } finally {

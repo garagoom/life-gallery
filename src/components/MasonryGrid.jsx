@@ -26,7 +26,7 @@ export default function MasonryGrid({ photos, onPhotoClick }) {
       {photos.map((photo) => {
         const cameraName = photo.camera_model || photo.camera_make || '';
         const brandLogo = getBrandLogo(photo.camera_make);
-        const author = photo.uploaded_by || photo.user?.displayName || photo.user?.username || '';
+        const author = photo.uploader_display_name || photo.uploaded_by || '';
 
         return (
           <div

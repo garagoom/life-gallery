@@ -65,8 +65,26 @@ async function initDb() {
   addColumnIfNotExists('flash', 'TEXT');
   addColumnIfNotExists('color_space', 'TEXT');
   addColumnIfNotExists('histogram', 'TEXT');
-  addColumnIfNotExists('gender', 'TEXT');
-  addColumnIfNotExists('bio', 'TEXT');
+
+  // Add user profile columns if they don't exist
+  const addUserColumnIfNotExists = (columnName, columnType) => {
+    try {
+      db.run(`ALTER TABLE users ADD COLUMN ${columnName} ${columnType}`);
+    } catch (e) {
+      // Column already exists, ignore
+    }
+  };
+
+  addUserColumnIfNotExists('gender', 'TEXT');
+  addUserColumnIfNotExists('bio', 'TEXT');
+  addUserColumnIfNotExists('login_session', 'TEXT');
+
+  // Add review_status to photos (0=pending, 1=approved, 2=rejected)
+  try {
+    db.run(`ALTER TABLE photos ADD COLUMN review_status INTEGER DEFAULT 1`);
+    // Set existing photos to approved
+    db.run(`UPDATE photos SET review_status = 1 WHERE review_status IS NULL`);
+  } catch (e) {}
 
   // Create users table
   db.run(`
@@ -162,15 +180,17 @@ async function initDb() {
   `);
 
   // Insert default roles
-  db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('admin', '管理员', 3)`);
-  db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('editor', '编辑者', 2)`);
-  db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('viewer', '查看者', 1)`);
+  db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('admin', '超级管理员', 4)`);
+  db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('module_admin', '模块管理员', 3)`);
+  db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('creator', '摄影创作者', 2)`);
+  db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('viewer', '访客', 1)`);
 
   // Insert default menus
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (1, NULL, 'photography', '摄影', 'CameraOutlined', '/photography', 1)`);
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (2, 1, 'home', '首页', 'HomeOutlined', '/photography/home', 1)`);
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (3, 1, 'portfolio', '作品集', 'PictureOutlined', '/photography/portfolio', 2)`);
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (4, 1, 'admin', '照片管理', 'SettingOutlined', '/photography/admin', 3)`);
+  db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (9, 1, 'review', '审核管理', 'SafetyOutlined', '/photography/admin/review', 4)`);
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (5, NULL, 'system', '系统管理', 'AppstoreOutlined', '/system', 10)`);
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (6, 5, 'users', '用户管理', 'TeamOutlined', '/photography/admin/users', 1)`);
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (7, 5, 'roles', '角色管理', 'SafetyOutlined', '/photography/admin/roles', 2)`);
@@ -178,8 +198,43 @@ async function initDb() {
 
   // Assign default permissions
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'admin'`);
-  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'editor' AND m.id IN (1, 2, 3, 4)`);
+  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'module_admin' AND m.id IN (1, 2, 3, 4, 9)`);
+  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'creator' AND m.id IN (1, 2, 3)`);
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'viewer' AND m.id IN (1, 2, 3)`);
+
+  // Create dictionaries table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS dictionaries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL,
+      value TEXT NOT NULL,
+      label TEXT NOT NULL,
+      color TEXT,
+      level INTEGER,
+      sort_order INTEGER DEFAULT 0,
+      status INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(type, value)
+    )
+  `);
+
+  // Seed dictionary data
+  const dicts = [
+    ['role', 'admin', '超级管理员', 'red', 4, 1],
+    ['role', 'module_admin', '模块管理员', 'orange', 3, 2],
+    ['role', 'creator', '摄影创作者', 'blue', 2, 3],
+    ['role', 'viewer', '访客', 'default', 1, 4],
+    ['review_status', '0', '待审核', 'orange', null, 1],
+    ['review_status', '1', '已通过', 'green', null, 2],
+    ['review_status', '2', '已拒绝', 'red', null, 3],
+    ['gender', 'male', '男', null, null, 1],
+    ['gender', 'female', '女', null, null, 2],
+    ['gender', 'secret', '保密', null, null, 3],
+  ];
+  for (const [type, value, label, color, level, sort_order] of dicts) {
+    db.run(`INSERT OR IGNORE INTO dictionaries (type, value, label, color, level, sort_order) VALUES (?, ?, ?, ?, ?, ?)`,
+      [type, value, label, color, level, sort_order]);
+  }
 
   // Add role_id column to users table
   try {
@@ -192,7 +247,12 @@ async function initDb() {
   db.run(`UPDATE users SET role_id = (SELECT id FROM roles WHERE roles.name = users.role) WHERE role_id IS NULL`);
 
   // Ensure admin user has correct role_id
-  db.run(`UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'admin') WHERE username = 'admin' AND role_id IS NULL`);
+  db.run(`UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'admin') WHERE username = 'admin'`);
+
+  // Backfill existing users: default avatar by gender, gender='secret' if null
+  db.run(`UPDATE users SET gender = 'secret' WHERE gender IS NULL`);
+  db.run(`UPDATE users SET avatar = '/images/avatars/male.svg' WHERE avatar IS NULL AND (gender = 'male' OR gender = 'secret' OR gender IS NULL)`);
+  db.run(`UPDATE users SET avatar = '/images/avatars/female.svg' WHERE avatar IS NULL AND gender = 'female'`);
 
   saveDb();
   return db;

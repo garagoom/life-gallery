@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Table, Button, Modal, Form, Input, InputNumber, Switch, Space, message, Popconfirm, Tag, Tree, Tabs, Empty } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { useDict } from '../contexts/DictContext';
 import styles from './Admin.module.css';
 
 export default function RoleManage() {
@@ -8,19 +9,22 @@ export default function RoleManage() {
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
+  const { getDict } = useDict();
+  const roles_dict = getDict('role');
   const [menuTree, setMenuTree] = useState([]);
   const [checkedKeys, setCheckedKeys] = useState([]);
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
-  const token = localStorage.getItem('accessToken');
-  const authHeaders = { 'Authorization': `Bearer ${token}` };
+  const getAuthHeaders = () => ({
+    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+  });
 
   const fetchRoles = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/roles', { headers: authHeaders });
+      const res = await fetch('/api/roles', { headers: getAuthHeaders() });
       const data = await res.json();
       if (data.code === 200) setRoles(data.data);
     } catch (err) {
@@ -31,7 +35,7 @@ export default function RoleManage() {
 
   const fetchMenuTree = async () => {
     try {
-      const res = await fetch('/api/menus', { headers: authHeaders });
+      const res = await fetch('/api/menus', { headers: getAuthHeaders() });
       const data = await res.json();
       if (data.code === 200) setMenuTree(data.data);
     } catch (err) {
@@ -41,7 +45,7 @@ export default function RoleManage() {
 
   const fetchRolePermissions = async (roleId) => {
     try {
-      const res = await fetch(`/api/roles/${roleId}`, { headers: authHeaders });
+      const res = await fetch(`/api/roles/${roleId}`, { headers: getAuthHeaders() });
       const data = await res.json();
       if (data.code === 200 && data.data.permissions) {
         setCheckedKeys(data.data.permissions.map(p => p.id));
@@ -81,7 +85,7 @@ export default function RoleManage() {
     try {
       const res = await fetch(`/api/roles/${id}`, {
         method: 'DELETE',
-        headers: authHeaders
+        headers: getAuthHeaders()
       });
       const data = await res.json();
       if (data.code === 200) {
@@ -106,7 +110,7 @@ export default function RoleManage() {
       const method = editingRole ? 'PUT' : 'POST';
       const res = await fetch(url, {
         method,
-        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...values, permissions: checkedKeys })
       });
       const data = await res.json();
@@ -124,8 +128,7 @@ export default function RoleManage() {
     }
   };
 
-  const levelColors = { 3: 'red', 2: 'blue', 1: 'default' };
-  const levelLabels = { 3: '超级管理员', 2: '管理员', 1: '普通用户' };
+  const getRoleByLevel = (level) => roles_dict.find(r => r.level === level);
 
   const columns = [
     {
@@ -151,7 +154,10 @@ export default function RoleManage() {
       key: 'level',
       width: 120,
       align: 'center',
-      render: (level) => <Tag color={levelColors[level]}>{levelLabels[level] || level}</Tag>,
+      render: (level) => {
+        const role = getRoleByLevel(level);
+        return <Tag color={role?.color || 'default'}>{role?.label || level}</Tag>;
+      },
     },
     {
       title: '用户数',

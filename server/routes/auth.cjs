@@ -38,7 +38,7 @@ function parseRefreshTokenExpiry() {
 
 router.post('/login', (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, force } = req.body;
     
     if (!username || !password) {
       return res.status(400).json({ code: 400, message: '请输入用户名和密码', data: null });
@@ -65,6 +65,19 @@ router.post('/login', (req, res) => {
       return res.status(401).json({ code: 401, message: '用户名或密码错误', data: null });
     }
     
+    // Single session: check if already logged in elsewhere
+    if (user.login_session && !force) {
+      return res.status(409).json({
+        code: 409,
+        message: '该账号已在其他设备登录，是否踢出对方？',
+        data: { sessionId: user.login_session }
+      });
+    }
+    
+    // Generate new session ID
+    const crypto = require('crypto');
+    const sessionId = crypto.randomUUID();
+    
     // Generate access and refresh tokens
     const { accessToken, refreshToken } = generateTokens(user);
     
@@ -77,8 +90,15 @@ router.post('/login', (req, res) => {
       [user.id, refreshToken, expiresAt.toISOString()]
     );
     
-    // Update user's last login time
-    db.run('UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
+    // Update user: set login_session, clear old refresh tokens if force
+    if (force) {
+      db.run('DELETE FROM refresh_tokens WHERE user_id = ?', [user.id]);
+      db.run(
+        'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (?, ?, ?)',
+        [user.id, refreshToken, expiresAt.toISOString()]
+      );
+    }
+    db.run('UPDATE users SET login_session = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [sessionId, user.id]);
     saveDb();
     
     res.json({
@@ -87,6 +107,7 @@ router.post('/login', (req, res) => {
       data: {
         accessToken,
         refreshToken,
+        sessionId,
         user: {
           id: user.id,
           username: user.username,
@@ -161,6 +182,14 @@ router.post('/refresh', (req, res) => {
     
     if (user.status === 0) {
       return res.status(403).json({ code: 403, message: '账号已被禁用', data: null });
+    }
+    
+    // Validate login session — if session was kicked, reject refresh
+    const { sessionId } = req.body;
+    if (sessionId && user.login_session && user.login_session !== sessionId) {
+      db.run('DELETE FROM refresh_tokens WHERE token = ?', [refreshToken]);
+      saveDb();
+      return res.status(401).json({ code: 401, message: '账号已在其他设备登录，请重新登录', data: null, expired: true });
     }
     
     // Generate new tokens

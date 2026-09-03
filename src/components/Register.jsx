@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Form, Input, Button, message, Typography, Radio, Space } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined, EditOutlined } from '@ant-design/icons';
+import { useDict } from '../contexts/DictContext';
 import styles from './Login.module.css';
 
 const { Text } = Typography;
@@ -10,6 +11,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const [form] = Form.useForm();
+  const { getDict } = useDict();
 
   const handleSubmit = async (values) => {
     setLoading(true);
@@ -56,9 +58,16 @@ export default function Register() {
           </Form.Item>
           <Form.Item name="gender" label="性别">
             <Radio.Group>
-              <Radio.Button value="male">男</Radio.Button>
-              <Radio.Button value="female">女</Radio.Button>
-              <Radio.Button value="secret">保密</Radio.Button>
+              {getDict('gender').map(g => (
+                <Radio.Button key={g.value} value={g.value}>{g.label}</Radio.Button>
+              ))}
+            </Radio.Group>
+          </Form.Item>
+          <Form.Item name="role" label="身份" initialValue="creator">
+            <Radio.Group>
+              {getDict('role').filter(r => ['creator', 'viewer'].includes(r.value)).map(r => (
+                <Radio.Button key={r.value} value={r.value}>{r.label}</Radio.Button>
+              ))}
             </Radio.Group>
           </Form.Item>
           <Form.Item name="bio">
