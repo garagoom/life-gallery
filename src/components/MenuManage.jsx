@@ -1,12 +1,41 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, InputNumber, Select, Space, message, Popconfirm } from 'antd';
+import { Button, Modal, Form, Input, InputNumber, Select, Space, message, Popconfirm, Switch } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useDict } from '../contexts/DictContext';
 import { iconList, getIcon } from '../utils/icons';
+import ListTable from './ListTable';
 import styles from './Admin.module.css';
+
+function toTableTree(nodes) {
+  return (nodes || []).map((node) => {
+    const { key, children, ...rest } = node;
+    const item = { ...rest, menuKey: key };
+    if (children?.length) item.children = toTableTree(children);
+    return item;
+  });
+}
+
+function collectExpandKeys(nodes, acc = []) {
+  (nodes || []).forEach((node) => {
+    if (node.children?.length) {
+      acc.push(node.id);
+      collectExpandKeys(node.children, acc);
+    }
+  });
+  return acc;
+}
+
+function flattenMenus(nodes, acc = []) {
+  (nodes || []).forEach((node) => {
+    acc.push(node);
+    if (node.children?.length) flattenMenus(node.children, acc);
+  });
+  return acc;
+}
 
 export default function MenuManage() {
   const [menus, setMenus] = useState([]);
+  const [expandedKeys, setExpandedKeys] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingMenu, setEditingMenu] = useState(null);
@@ -25,11 +54,14 @@ export default function MenuManage() {
     setLoading(true);
     try {
       const res = await fetch('/api/menus', {
+        cache: 'no-store',
         headers: getAuthHeaders()
       });
       const data = await res.json();
       if (data.code === 200) {
-        setMenus(data.data);
+        const tree = toTableTree(data.data);
+        setMenus(tree);
+        setExpandedKeys(collectExpandKeys(tree));
       }
     } catch (err) {
       message.error('获取菜单列表失败');
@@ -48,7 +80,7 @@ export default function MenuManage() {
 
   const handleEdit = (record) => {
     setEditingMenu(record);
-    form.setFieldsValue(record);
+    form.setFieldsValue({ ...record, key: record.menuKey });
     setModalVisible(true);
   };
 
@@ -62,7 +94,7 @@ export default function MenuManage() {
       const data = await res.json();
       if (data.code === 200) {
         message.success('删除成功');
-        fetchMenus();
+        await fetchMenus();
       } else {
         message.error(data.message);
       }
@@ -92,7 +124,7 @@ export default function MenuManage() {
       if (data.code === 200) {
         message.success(editingMenu ? '更新成功' : '创建成功');
         setModalVisible(false);
-        fetchMenus();
+        await fetchMenus();
       } else {
         message.error(data.message);
       }
@@ -106,8 +138,8 @@ export default function MenuManage() {
   const columns = [
     {
       title: 'Key',
-      dataIndex: 'key',
-      key: 'key',
+      dataIndex: 'menuKey',
+      key: 'menuKey',
       width: 150,
     },
     {
@@ -144,7 +176,10 @@ export default function MenuManage() {
       key: 'icon',
       width: 80,
       align: 'center',
-      render: (text) => text ? <span style={{ fontSize: 16 }}>{getIcon(text)}</span> : '-',
+      render: (text) => {
+        const icon = getIcon(text);
+        return icon ? <span style={{ fontSize: 18, display: 'inline-flex' }}>{icon}</span> : '-';
+      },
     },
     {
       title: '路径',
@@ -185,15 +220,17 @@ export default function MenuManage() {
         <Button type="primary" icon={<PlusOutlined />} onClick={() => handleAdd()}>新建菜单</Button>
       </div>
       <div className={styles.tableWrap}>
-        <Table
+        <ListTable
           columns={columns}
           dataSource={menus}
-          rowKey="id"
           loading={loading}
           pagination={false}
           scroll={{ x: 800, y: 'calc(100vh - 160px)' }}
           childrenColumnName="children"
-          expandable={{ defaultExpandAllRows: true }}
+          expandable={{
+            expandedRowKeys: expandedKeys,
+            onExpandedRowsChange: setExpandedKeys,
+          }}
         />
       </div>
 
@@ -209,7 +246,7 @@ export default function MenuManage() {
         <Form form={form} layout="vertical" style={{ marginTop: 24 }}>
           <Form.Item name="parent_id" label="上级菜单">
             <Select allowClear placeholder="无（顶级菜单）">
-              {menus.map(m => (
+              {flattenMenus(menus).map(m => (
                 <Select.Option key={m.id} value={m.id}>{m.label}</Select.Option>
               ))}
             </Select>
@@ -239,17 +276,17 @@ export default function MenuManage() {
               showSearch
               placeholder="选择图标"
               allowClear
-              optionFilterProp="label"
-              options={iconList.map(item => ({
-                label: (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              optionFilterProp="value"
+            >
+              {iconList.map((item) => (
+                <Select.Option key={item.value} value={item.value}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                     {item.icon}
-                    <span>{item.label}</span>
+                    <span>{item.value}</span>
                   </span>
-                ),
-                value: item.value,
-              }))}
-            />
+                </Select.Option>
+              ))}
+            </Select>
           </Form.Item>
           <Form.Item name="path" label="路径">
             <Input placeholder="输入路径" />

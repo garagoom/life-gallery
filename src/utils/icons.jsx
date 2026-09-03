@@ -1,3 +1,4 @@
+import { cloneElement } from 'react';
 import {
   CameraOutlined,
   UserOutlined,
@@ -89,4 +90,7 @@ iconList.forEach(item => {
   iconMap[item.value] = item.icon;
 });
 
-export const getIcon = (name) => iconMap[name] || null;
+export const getIcon = (name) => {
+  const el = iconMap[name];
+  return el ? cloneElement(el) : null;
+};

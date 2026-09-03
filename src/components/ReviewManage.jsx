@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Image, Space, Popconfirm, Tag, Select, message } from 'antd';
-import { CheckOutlined, CloseOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Button, Image, Space, Popconfirm, Tag, Select, message } from 'antd';
+import { CheckOutlined, CloseOutlined, ReloadOutlined } from '@ant-design/icons';
 import { getReviewPhotos, reviewPhoto, batchReviewPhotos } from '../api/photos';
-import { getPhotoUrl, getThumbnailUrl } from '../data/photos';
+import { getThumbnailUrl } from '../data/photos';
 import { useDict } from '../contexts/DictContext';
+import ListTable from './ListTable';
 import styles from './Admin.module.css';
 
 export default function ReviewManage() {
@@ -22,7 +23,7 @@ export default function ReviewManage() {
       const params = { page, pageSize };
       if (filter !== undefined) params.review_status = filter;
       const result = await getReviewPhotos(params);
-      setPhotos(result.data);
+      setPhotos(result.data || []);
       setPagination(result.pagination);
     } catch (err) {
       message.error(err.message || '加载失败');
@@ -160,10 +161,9 @@ export default function ReviewManage() {
       </div>
 
       <div className={styles.tableWrap}>
-        <Table
+        <ListTable
           columns={columns}
           dataSource={photos}
-          rowKey="id"
           loading={loading}
           rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
           pagination={{

@@ -12,7 +12,7 @@ async function request(url, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(url, { ...options, headers });
+  const res = await fetch(url, { cache: 'no-store', ...options, headers });
   const json = await res.json();
 
   if (json.code === 401 && json.expired && !isRefreshing) {
@@ -30,7 +30,7 @@ async function request(url, options = {}) {
           localStorage.setItem(ACCESS_TOKEN_KEY, refreshJson.data.accessToken);
           localStorage.setItem(REFRESH_TOKEN_KEY, refreshJson.data.refreshToken);
           headers['Authorization'] = `Bearer ${refreshJson.data.accessToken}`;
-          const retryRes = await fetch(url, { ...options, headers });
+          const retryRes = await fetch(url, { cache: 'no-store', ...options, headers });
           isRefreshing = false;
           return await retryRes.json();
         }

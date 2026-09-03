@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Table, Button, Modal, Form, Input, Select, Upload, Image, Space, Popconfirm, message, Progress, DatePicker, ConfigProvider } from 'antd';
+import { Button, Modal, Form, Input, Select, Upload, Image, Space, Popconfirm, message, Progress, DatePicker, ConfigProvider } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, FolderOpenOutlined, SearchOutlined, ReloadOutlined, TeamOutlined } from '@ant-design/icons';
 import zhCN from 'antd/locale/zh_CN';
 import dayjs from 'dayjs';
@@ -8,6 +8,7 @@ import { getPhotos, uploadPhoto, batchUploadPhotos, updatePhoto, deletePhoto, ba
 import { getPhotoUrl, getThumbnailUrl } from '../data/photos';
 import { useAuth } from '../contexts/AuthContext';
 import { useDict } from '../contexts/DictContext';
+import ListTable from './ListTable';
 import styles from './Admin.module.css';
 
 export default function Admin() {
@@ -44,7 +45,7 @@ export default function Admin() {
     setLoading(true);
     try {
       const result = await getPhotos({ page, pageSize, ...search });
-      setPhotos(result.data);
+      setPhotos(result.data || []);
       setPagination(result.pagination);
     } catch (error) {
       message.error(error.message || '加载照片失败');
@@ -385,10 +386,9 @@ export default function Admin() {
         </div>
 
         <div className={styles.tableWrap}>
-          <Table
+          <ListTable
             columns={columns}
             dataSource={photos}
-            rowKey="id"
             loading={loading}
             rowSelection={{
               selectedRowKeys,

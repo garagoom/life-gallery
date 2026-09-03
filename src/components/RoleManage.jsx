@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, InputNumber, Switch, Space, message, Popconfirm, Tag, Tree, Tabs, Empty } from 'antd';
+import { Button, Modal, Form, Input, InputNumber, Switch, Space, message, Popconfirm, Tree, Empty } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useDict } from '../contexts/DictContext';
+import ListTable from './ListTable';
 import styles from './Admin.module.css';
 
 export default function RoleManage() {
@@ -24,9 +25,11 @@ export default function RoleManage() {
   const fetchRoles = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/roles', { headers: getAuthHeaders() });
+      const res = await fetch('/api/roles', { cache: 'no-store', headers: getAuthHeaders() });
       const data = await res.json();
-      if (data.code === 200) setRoles(data.data);
+      if (data.code === 200) {
+        setRoles([...(data.data || [])]);
+      }
     } catch (err) {
       message.error('获取角色列表失败');
     }
@@ -191,7 +194,7 @@ export default function RoleManage() {
         <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新建角色</Button>
       </div>
       <div className={styles.tableWrap}>
-        <Table columns={columns} dataSource={roles} rowKey="id" loading={loading} pagination={false} scroll={{ x: 600, y: 'calc(100vh - 160px)' }} />
+        <ListTable columns={columns} dataSource={roles} loading={loading} pagination={false} scroll={{ x: 600, y: 'calc(100vh - 160px)' }} />
       </div>
 
       <Modal

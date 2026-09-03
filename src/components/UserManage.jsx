@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, Select, Switch, Space, Popconfirm, Tag, Avatar, message } from 'antd';
+import { Button, Modal, Form, Input, Select, Switch, Space, Popconfirm, Tag, Avatar, message } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined } from '@ant-design/icons';
 import { getUsers, createUser, updateUser, updateUserStatus, deleteUser } from '../api/users';
 import { useAuth } from '../contexts/AuthContext';
 import { useDict } from '../contexts/DictContext';
+import ListTable from './ListTable';
 import styles from './Admin.module.css';
 
 export default function UserManage() {
@@ -226,10 +227,9 @@ export default function UserManage() {
       </div>
 
       <div className={styles.tableWrap}>
-        <Table
+        <ListTable
           columns={columns}
           dataSource={users}
-          rowKey="id"
           loading={loading}
           scroll={{ x: 900, y: 'calc(100vh - 160px)' }}
           pagination={{

@@ -30,6 +30,13 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    res.setHeader('Cache-Control', 'no-store');
+  }
+  next();
+});
+
 app.use(express.json({ limit: '10mb' }));
 
 // Static files - 上传的图片缓存30天

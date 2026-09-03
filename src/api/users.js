@@ -8,7 +8,7 @@ async function request(url, options = {}) {
     'Content-Type': 'application/json'
   };
   
-  const res = await fetch(url, { ...options, headers });
+  const res = await fetch(url, { cache: 'no-store', ...options, headers });
   const json = await res.json();
   
   if (json.code === 401) {

@@ -158,3 +158,6 @@ build/
 
 # Debug
 *.local
+
+# Deployment guide (local only)
+DEPLOY.md
