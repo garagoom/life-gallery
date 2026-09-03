@@ -2,11 +2,11 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { getDb, saveDb } = require('../db.cjs');
 const { authMiddleware } = require('../middleware/auth.cjs');
-const { requireAdmin } = require('../middleware/permission.cjs');
+const { requireMenu } = require('../middleware/permission.cjs');
 
 const router = express.Router();
 
-router.use(authMiddleware, requireAdmin);
+router.use(authMiddleware, requireMenu('users'));
 
 const DEFAULT_AVATARS = {
   male: '/images/avatars/male.svg',

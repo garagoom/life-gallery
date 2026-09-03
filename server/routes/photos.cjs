@@ -6,8 +6,7 @@ const sharp = require('sharp');
 const exifReader = require('exif-reader');
 const { getDb, saveDb } = require('../db.cjs');
 const { authMiddleware } = require('../middleware/auth.cjs');
-const { requireRole, requireAdmin } = require('../middleware/permission.cjs');
-const requireCreator = requireRole('module_admin', 'creator');
+const { requireMenu } = require('../middleware/permission.cjs');
 
 const router = express.Router();
 
@@ -406,7 +405,7 @@ router.get('/', authMiddleware, (req, res) => {
 });
 
 // DELETE /api/photos/batch - Batch delete
-router.post('/batch-delete', authMiddleware, requireCreator, (req, res) => {
+router.post('/batch-delete', authMiddleware, requireMenu('admin'), (req, res) => {
   try {
     const { ids } = req.body;
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -445,7 +444,7 @@ router.post('/batch-delete', authMiddleware, requireCreator, (req, res) => {
 });
 
 // GET /api/photos/review - List all photos for review (module_admin+)
-router.get('/review', authMiddleware, requireModuleAdmin, (req, res) => {
+router.get('/review', authMiddleware, requireMenu('review'), (req, res) => {
   try {
     const db = getDb();
     const { review_status, page = 1, pageSize = 20 } = req.query;
@@ -491,7 +490,7 @@ router.get('/review', authMiddleware, requireModuleAdmin, (req, res) => {
 });
 
 // PUT /api/photos/batch-review - Batch approve/reject
-router.post('/batch-review', authMiddleware, requireModuleAdmin, (req, res) => {
+router.post('/batch-review', authMiddleware, requireMenu('review'), (req, res) => {
   try {
     const { ids, review_status } = req.body;
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -553,7 +552,7 @@ router.get('/:id', (req, res) => {
 });
 
 // POST /api/photos - Single upload
-router.post('/', authMiddleware, requireCreator, upload.single('file'), async (req, res) => {
+router.post('/', authMiddleware, requireMenu('admin'), upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return error(res, '请选择要上传的文件', 400);
@@ -598,7 +597,7 @@ router.post('/', authMiddleware, requireCreator, upload.single('file'), async (r
 });
 
 // POST /api/photos/batch - Batch upload
-router.post('/batch', authMiddleware, requireCreator, upload.array('files', 100), async (req, res) => {
+router.post('/batch', authMiddleware, requireMenu('admin'), upload.array('files', 100), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return error(res, '请选择要上传的文件', 400);
@@ -657,7 +656,7 @@ router.post('/batch', authMiddleware, requireCreator, upload.array('files', 100)
 });
 
 // PUT /api/photos/:id
-router.put('/:id', authMiddleware, requireCreator, (req, res) => {
+router.put('/:id', authMiddleware, requireMenu('admin'), (req, res) => {
   try {
     const db = getDb();
     const { title, date, category } = req.body;
@@ -703,7 +702,7 @@ router.put('/:id', authMiddleware, requireCreator, (req, res) => {
 });
 
 // DELETE /api/photos/:id
-router.delete('/:id', authMiddleware, requireCreator, (req, res) => {
+router.delete('/:id', authMiddleware, requireMenu('admin'), (req, res) => {
   try {
     const db = getDb();
     
@@ -740,7 +739,7 @@ router.delete('/:id', authMiddleware, requireCreator, (req, res) => {
 });
 
 // PUT /api/photos/:id/review - Approve or reject a photo
-router.put('/:id/review', authMiddleware, requireModuleAdmin, (req, res) => {
+router.put('/:id/review', authMiddleware, requireMenu('review'), (req, res) => {
   try {
     const { review_status } = req.body;
     if (![1, 2].includes(review_status)) {

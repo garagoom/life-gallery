@@ -2,10 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { getDb, saveDb } = require('../db.cjs');
 const { authMiddleware } = require('../middleware/auth.cjs');
-const { requireAdmin } = require('../middleware/permission.cjs');
+const { requireMenu } = require('../middleware/permission.cjs');
 
 // 获取所有角色
-router.get('/', authMiddleware, requireAdmin, (req, res) => {
+router.get('/', authMiddleware, requireMenu('roles'), (req, res) => {
   try {
     const db = getDb();
     const roles = db.exec(`
@@ -33,7 +33,7 @@ router.get('/', authMiddleware, requireAdmin, (req, res) => {
 });
 
 // 获取单个角色及其权限
-router.get('/:id', authMiddleware, requireAdmin, (req, res) => {
+router.get('/:id', authMiddleware, requireMenu('roles'), (req, res) => {
   try {
     const db = getDb();
     const role = db.exec(`SELECT * FROM roles WHERE id = ?`, [req.params.id])[0];
@@ -70,7 +70,7 @@ router.get('/:id', authMiddleware, requireAdmin, (req, res) => {
 });
 
 // 创建角色
-router.post('/', authMiddleware, requireAdmin, (req, res) => {
+router.post('/', authMiddleware, requireMenu('roles'), (req, res) => {
   try {
     const { name, label, level, permissions } = req.body;
     if (!name || !label) {
@@ -109,7 +109,7 @@ router.post('/', authMiddleware, requireAdmin, (req, res) => {
 });
 
 // 更新角色
-router.put('/:id', authMiddleware, requireAdmin, (req, res) => {
+router.put('/:id', authMiddleware, requireMenu('roles'), (req, res) => {
   try {
     const { name, label, level, status, permissions } = req.body;
     const db = getDb();
@@ -155,7 +155,7 @@ router.put('/:id', authMiddleware, requireAdmin, (req, res) => {
 });
 
 // 删除角色
-router.delete('/:id', authMiddleware, requireAdmin, (req, res) => {
+router.delete('/:id', authMiddleware, requireMenu('roles'), (req, res) => {
   try {
     const db = getDb();
 

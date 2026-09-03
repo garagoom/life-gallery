@@ -2,10 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { getDb, saveDb } = require('../db.cjs');
 const { authMiddleware } = require('../middleware/auth.cjs');
-const { requireAdmin } = require('../middleware/permission.cjs');
+const { requireMenu } = require('../middleware/permission.cjs');
 
 // 获取所有菜单（树形结构）
-router.get('/', authMiddleware, requireAdmin, (req, res) => {
+router.get('/', authMiddleware, requireMenu('menus'), (req, res) => {
   try {
     const db = getDb();
     const menus = db.exec(`SELECT * FROM menus ORDER BY sort_order ASC`)[0];
@@ -17,10 +17,12 @@ router.get('/', authMiddleware, requireAdmin, (req, res) => {
       label: row[3],
       icon: row[4],
       path: row[5],
-      sort_order: row[6],
-      status: row[7],
-      created_at: row[8],
-      updated_at: row[9]
+      type: row[6],
+      visible: row[7],
+      sort_order: row[8],
+      status: row[9],
+      created_at: row[10],
+      updated_at: row[11]
     })) : [];
 
     // 构建树形结构
@@ -44,7 +46,7 @@ router.get('/', authMiddleware, requireAdmin, (req, res) => {
 });
 
 // 获取所有菜单（平铺，用于权限选择）
-router.get('/flat', authMiddleware, requireAdmin, (req, res) => {
+router.get('/flat', authMiddleware, requireMenu('menus'), (req, res) => {
   try {
     const db = getDb();
     const menus = db.exec(`SELECT * FROM menus ORDER BY sort_order ASC`)[0];
@@ -56,8 +58,10 @@ router.get('/flat', authMiddleware, requireAdmin, (req, res) => {
       label: row[3],
       icon: row[4],
       path: row[5],
-      sort_order: row[6],
-      status: row[7]
+      type: row[6],
+      visible: row[7],
+      sort_order: row[8],
+      status: row[9]
     })) : [];
 
     res.json({ code: 200, message: 'success', data: list });
@@ -71,11 +75,11 @@ router.get('/my', authMiddleware, (req, res) => {
   try {
     const db = getDb();
     const menus = db.exec(`
-      SELECT DISTINCT m.id, m.parent_id, m.key, m.label, m.icon, m.path, m.sort_order
+      SELECT DISTINCT m.id, m.parent_id, m.key, m.label, m.icon, m.path, m.type, m.visible, m.sort_order
       FROM menus m
       JOIN role_permissions rp ON m.id = rp.menu_id
       JOIN users u ON rp.role_id = u.role_id
-      WHERE u.id = ? AND m.status = 1
+      WHERE u.id = ? AND m.status = 1 AND m.visible = 1
       ORDER BY m.sort_order ASC
     `, [req.user.id])[0];
     
@@ -86,7 +90,9 @@ router.get('/my', authMiddleware, (req, res) => {
       label: row[3],
       icon: row[4],
       path: row[5],
-      sort_order: row[6]
+      type: row[6],
+      visible: row[7],
+      sort_order: row[8]
     })) : [];
 
     // 构建树形结构
@@ -110,9 +116,9 @@ router.get('/my', authMiddleware, (req, res) => {
 });
 
 // 创建菜单
-router.post('/', authMiddleware, requireAdmin, (req, res) => {
+router.post('/', authMiddleware, requireMenu('menus'), (req, res) => {
   try {
-    const { parent_id, key, label, icon, path, sort_order } = req.body;
+    const { parent_id, key, label, icon, path, type, visible, sort_order } = req.body;
     if (!key || !label) {
       return res.status(400).json({ code: 400, message: '菜单 key 和 label 不能为空' });
     }
@@ -125,8 +131,8 @@ router.post('/', authMiddleware, requireAdmin, (req, res) => {
       return res.status(400).json({ code: 400, message: '菜单 key 已存在' });
     }
 
-    db.run(`INSERT INTO menus (parent_id, key, label, icon, path, sort_order) VALUES (?, ?, ?, ?, ?, ?)`,
-      [parent_id || null, key, label, icon || null, path || null, sort_order || 0]);
+    db.run(`INSERT INTO menus (parent_id, key, label, icon, path, type, visible, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [parent_id || null, key, label, icon || null, path || null, type || 'menu', visible !== undefined ? visible : 1, sort_order || 0]);
     
     const result = db.exec(`SELECT last_insert_rowid()`)[0];
     const menuId = result.values[0][0];
@@ -139,9 +145,9 @@ router.post('/', authMiddleware, requireAdmin, (req, res) => {
 });
 
 // 更新菜单
-router.put('/:id', authMiddleware, requireAdmin, (req, res) => {
+router.put('/:id', authMiddleware, requireMenu('menus'), (req, res) => {
   try {
-    const { parent_id, key, label, icon, path, sort_order, status } = req.body;
+    const { parent_id, key, label, icon, path, type, visible, sort_order, status } = req.body;
     const db = getDb();
 
     // 检查 key 唯一性
@@ -153,8 +159,8 @@ router.put('/:id', authMiddleware, requireAdmin, (req, res) => {
       }
     }
 
-    db.run(`UPDATE menus SET parent_id = ?, key = ?, label = ?, icon = ?, path = ?, sort_order = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [parent_id || null, key, label, icon, path, sort_order, status, req.params.id]);
+    db.run(`UPDATE menus SET parent_id = ?, key = ?, label = ?, icon = ?, path = ?, type = ?, visible = ?, sort_order = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [parent_id || null, key, label, icon, path, type || 'menu', visible !== undefined ? visible : 1, sort_order, status, req.params.id]);
 
     saveDb();
     res.json({ code: 200, message: '菜单更新成功' });
@@ -164,7 +170,7 @@ router.put('/:id', authMiddleware, requireAdmin, (req, res) => {
 });
 
 // 删除菜单
-router.delete('/:id', authMiddleware, requireAdmin, (req, res) => {
+router.delete('/:id', authMiddleware, requireMenu('menus'), (req, res) => {
   try {
     const db = getDb();
 

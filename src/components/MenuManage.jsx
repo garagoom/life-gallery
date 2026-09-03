@@ -112,6 +112,26 @@ export default function MenuManage() {
       width: 150,
     },
     {
+      title: '类型',
+      dataIndex: 'type',
+      key: 'type',
+      width: 80,
+      align: 'center',
+      render: (val) => {
+        const colorMap = { module: 'blue', menu: 'green', button: 'orange' };
+        const labelMap = { module: '模块', menu: '菜单', button: '按钮' };
+        return <span style={{ color: `var(--${colorMap[val] || 'text'})` }}>{labelMap[val] || val}</span>;
+      },
+    },
+    {
+      title: '可见',
+      dataIndex: 'visible',
+      key: 'visible',
+      width: 70,
+      align: 'center',
+      render: (val) => <Switch checked={val === 1} disabled size="small" />,
+    },
+    {
       title: '图标',
       dataIndex: 'icon',
       key: 'icon',
@@ -131,14 +151,6 @@ export default function MenuManage() {
       key: 'sort_order',
       width: 70,
       align: 'center',
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 80,
-      align: 'center',
-      render: (val) => <Switch checked={val === 1} disabled size="small" />,
     },
     {
       title: '操作',
@@ -199,6 +211,16 @@ export default function MenuManage() {
           </Form.Item>
           <Form.Item name="label" label="标签" rules={[{ required: true, message: '请输入标签' }]}>
             <Input placeholder="输入标签" />
+          </Form.Item>
+          <Form.Item name="type" label="类型" initialValue="menu">
+            <Select>
+              <Select.Option value="module">模块</Select.Option>
+              <Select.Option value="menu">菜单</Select.Option>
+              <Select.Option value="button">按钮</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="visible" label="可见" initialValue={1} valuePropName="checked">
+            <Switch checkedChildren="显示" unCheckedChildren="隐藏" />
           </Form.Item>
           <Form.Item name="icon" label="图标">
             <Input placeholder="输入图标名" />

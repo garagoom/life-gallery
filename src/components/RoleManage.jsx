@@ -59,7 +59,7 @@ export default function RoleManage() {
 
   const buildTreeData = (items) => {
     return items.map(item => ({
-      title: item.label,
+      title: `${item.label} (${item.type === 'module' ? '模块' : item.type === 'button' ? '按钮' : '菜单'})`,
       key: item.id,
       children: item.children ? buildTreeData(item.children) : [],
     }));

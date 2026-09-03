@@ -161,6 +161,8 @@ async function initDb() {
       label TEXT NOT NULL,
       icon TEXT,
       path TEXT,
+      type TEXT DEFAULT 'menu',
+      visible INTEGER DEFAULT 1,
       sort_order INTEGER DEFAULT 0,
       status INTEGER DEFAULT 1,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -244,6 +246,32 @@ async function initDb() {
     db.run(`ALTER TABLE users ADD COLUMN role_id INTEGER`);
   } catch (e) {
     // Column already exists, ignore
+  }
+
+  // Add type/visible columns to menus table
+  try {
+    db.run(`ALTER TABLE menus ADD COLUMN type TEXT DEFAULT 'menu'`);
+  } catch (e) {}
+  try {
+    db.run(`ALTER TABLE menus ADD COLUMN visible INTEGER DEFAULT 1`);
+  } catch (e) {}
+
+  // Set type for existing menus
+  db.run(`UPDATE menus SET type = 'module' WHERE parent_id IS NULL AND type = 'menu'`);
+  db.run(`UPDATE menus SET type = 'button' WHERE key IN ('admin', 'review') AND type = 'menu'`);
+  db.run(`UPDATE menus SET type = 'menu' WHERE parent_id IS NOT NULL AND key NOT IN ('admin', 'review') AND type = 'menu'`);
+
+  // Seed menu_type and visible dictionaries
+  const menuDicts = [
+    ['menu_type', 'module', '模块', 'blue', null, 1],
+    ['menu_type', 'menu', '菜单', 'green', null, 2],
+    ['menu_type', 'button', '按钮', 'orange', null, 3],
+    ['visible', '1', '显示', 'green', null, 1],
+    ['visible', '0', '隐藏', 'default', null, 2],
+  ];
+  for (const [type, value, label, color, level, sort_order] of menuDicts) {
+    db.run(`INSERT OR IGNORE INTO dictionaries (type, value, label, color, level, sort_order) VALUES (?, ?, ?, ?, ?, ?)`,
+      [type, value, label, color, level, sort_order]);
   }
 
   // Migrate existing role string to role_id
