@@ -1,10 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db.cjs');
-const { authMiddleware } = require('../middleware/auth.cjs');
 
-// GET /api/dict — all dictionary types
-router.get('/', authMiddleware, (req, res) => {
+// GET /api/dict — all dictionary types (public, no auth needed)
+router.get('/', (req, res) => {
   try {
     const db = getDb();
     const result = db.exec(`SELECT type, value, label, color, level, sort_order FROM dictionaries WHERE status = 1 ORDER BY type, sort_order ASC`);
@@ -20,8 +19,8 @@ router.get('/', authMiddleware, (req, res) => {
   }
 });
 
-// GET /api/dict/:type — single type
-router.get('/:type', authMiddleware, (req, res) => {
+// GET /api/dict/:type — single type (public, no auth needed)
+router.get('/:type', (req, res) => {
   try {
     const db = getDb();
     const result = db.exec(
