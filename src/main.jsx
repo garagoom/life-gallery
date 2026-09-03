@@ -1,11 +1,16 @@
 import React, { useMemo } from 'react'
 import ReactDOM from 'react-dom/client'
 import { ConfigProvider, theme as antTheme } from 'antd'
+import zhCN from 'antd/locale/zh_CN'
+import dayjs from 'dayjs'
+import 'dayjs/locale/zh-cn'
 import App from './App.jsx'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import { DictProvider } from './contexts/DictContext'
 import './index.css'
+
+dayjs.locale('zh-cn')
 
 function ThemedConfigProvider({ children }) {
   const { theme } = useTheme();
@@ -40,7 +45,7 @@ function ThemedConfigProvider({ children }) {
   }), [isDark]);
 
   return (
-    <ConfigProvider theme={antdTheme}>
+    <ConfigProvider theme={antdTheme} locale={zhCN}>
       {children}
     </ConfigProvider>
   );

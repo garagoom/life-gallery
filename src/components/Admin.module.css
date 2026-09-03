@@ -34,7 +34,7 @@
 .tableWrap {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .tableWrap :global(.ant-pagination) {

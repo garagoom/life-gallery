@@ -22,7 +22,7 @@ export default function ListTable({ dataSource, ...rest }) {
       dataSource={tableRows}
       virtual={false}
       rowKey={typeof rowKey === 'function' ? rowKey : (record) => record?.[rowKey]}
-      scroll={scroll?.x ? { x: scroll.x } : undefined}
+      scroll={scroll}
     />
   );
 }
