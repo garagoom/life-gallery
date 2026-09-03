@@ -274,6 +274,17 @@ export default function Admin() {
       },
     },
     {
+      title: '位置',
+      key: 'gps',
+      width: 60,
+      align: 'center',
+      render: (_, record) => (
+        record?.latitude != null && record?.longitude != null
+          ? <span title={`${record.latitude}, ${record.longitude}`} style={{ cursor: 'default' }}>📍</span>
+          : <span style={{ color: 'var(--text-secondary)' }}>-</span>
+      ),
+    },
+    {
       title: '审核',
       key: 'review_status',
       width: 80,
@@ -400,7 +411,7 @@ export default function Admin() {
               },
             }}
             onChange={handleTableChange}
-            scroll={{ x: 900 }}
+            scroll={{ x: 900, y: 'calc(100vh - 280px)' }}
           />
         </div>
 

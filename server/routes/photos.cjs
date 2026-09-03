@@ -102,6 +102,14 @@ function formatDateValue(dateValue) {
   return null;
 }
 
+// Convert GPS DMS (degrees/minutes/seconds) to decimal
+function dmsToDecimal(dms, ref) {
+  if (!dms || !Array.isArray(dms) || dms.length < 3) return null;
+  let decimal = dms[0] + dms[1] / 60 + dms[2] / 3600;
+  if (ref === 'S' || ref === 'W') decimal = -decimal;
+  return Math.round(decimal * 1000000) / 1000000;
+}
+
 // Extract EXIF data from image
 async function extractExif(filePath) {
   try {
@@ -119,6 +127,18 @@ async function extractExif(filePath) {
     const image = exifData.Image || {};
     const photo = exifData.Photo || {};
     const exifIFD = exifData.exif || {};
+    const gps = exifData.GPSInfo || {};
+    
+    // Extract GPS coordinates
+    let latitude = null, longitude = null, altitude = null;
+    if (gps.GPSLatitude && gps.GPSLongitude) {
+      latitude = dmsToDecimal(gps.GPSLatitude, gps.GPSLatitudeRef);
+      longitude = dmsToDecimal(gps.GPSLongitude, gps.GPSLongitudeRef);
+    }
+    if (gps.GPSAltitude) {
+      altitude = typeof gps.GPSAltitude === 'number' ? gps.GPSAltitude : null;
+      if (gps.GPSAltitudeRef === 1 && altitude) altitude = -altitude;
+    }
     
     return {
       make: image.Make || null,
@@ -136,6 +156,9 @@ async function extractExif(filePath) {
       meteringMode: photo.MeteringMode || exifIFD.MeteringMode || null,
       flash: photo.Flash || exifIFD.Flash || null,
       colorSpace: photo.ColorSpace || exifIFD.ColorSpace || null,
+      latitude,
+      longitude,
+      altitude,
     };
   } catch (error) {
     console.error('EXIF extraction error:', error);
@@ -144,6 +167,7 @@ async function extractExif(filePath) {
       iso: null, focalLength: null, dateTime: null, width: null,
       height: null, software: null, lensModel: null, whiteBalance: null,
       meteringMode: null, flash: null, colorSpace: null,
+      latitude: null, longitude: null, altitude: null,
     };
   }
 }
@@ -191,6 +215,9 @@ function formatExif(exif) {
     meteringMode: exif.meteringMode,
     flash: exif.flash,
     colorSpace: exif.colorSpace,
+    latitude: exif.latitude,
+    longitude: exif.longitude,
+    altitude: exif.altitude,
   };
 }
 
@@ -254,6 +281,9 @@ async function processPhoto(file, title, date, category) {
     meteringMode: formattedExif.meteringMode,
     flash: formattedExif.flash,
     colorSpace: formattedExif.colorSpace,
+    latitude: formattedExif.latitude,
+    longitude: formattedExif.longitude,
+    altitude: formattedExif.altitude,
   };
 }
 
@@ -301,15 +331,20 @@ router.get('/random', (req, res) => {
 router.get('/', authMiddleware, (req, res) => {
   try {
     const db = getDb();
-    const { category, title, dateFrom, dateTo, page = 1, pageSize = 20 } = req.query;
+    const { category, title, dateFrom, dateTo, page = 1, pageSize = 20, scope } = req.query;
     
     let whereConditions = [];
     let params = [];
     
-    // Permission: non-admin users can only see their own photos
-    if (req.user && req.user.role !== 'admin') {
+    // scope=all: show all approved photos (for portfolio)
+    // default: non-admin users only see their own photos (for admin page)
+    if (scope !== 'all' && req.user && req.user.role !== 'admin') {
       whereConditions.push('p.uploaded_by = ?');
       params.push(req.user.username);
+    }
+    
+    // Non-admin always see only approved photos
+    if (req.user && req.user.role !== 'admin') {
       whereConditions.push('p.review_status = 1');
     }
     
@@ -534,15 +569,18 @@ router.post('/', authMiddleware, requireCreator, upload.single('file'), async (r
     db.run(
       `INSERT INTO photos (title, filename, thumbnail, date, category, rotation, 
        camera_make, camera_model, exposure_time, f_number, iso, focal_length,
-       software, lens_model, white_balance, metering_mode, flash, color_space, uploaded_by, review_status) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       software, lens_model, white_balance, metering_mode, flash, color_space, 
+       latitude, longitude, altitude, uploaded_by, review_status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         photoData.title, photoData.filename, photoData.thumbnail,
         photoData.date, photoData.category, photoData.rotation,
         photoData.cameraMake, photoData.cameraModel, photoData.exposureTime,
         photoData.fNumber, photoData.iso, photoData.focalLength,
         photoData.software, photoData.lensModel, photoData.whiteBalance,
-        photoData.meteringMode, photoData.flash, photoData.colorSpace, uploadedBy, reviewStatus,
+        photoData.meteringMode, photoData.flash, photoData.colorSpace,
+        photoData.latitude, photoData.longitude, photoData.altitude,
+        uploadedBy, reviewStatus,
       ]
     );
     saveDb();
@@ -581,15 +619,18 @@ router.post('/batch', authMiddleware, requireCreator, upload.array('files', 100)
         db.run(
           `INSERT INTO photos (title, filename, thumbnail, date, category, rotation,
            camera_make, camera_model, exposure_time, f_number, iso, focal_length,
-           software, lens_model, white_balance, metering_mode, flash, color_space, uploaded_by, review_status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           software, lens_model, white_balance, metering_mode, flash, color_space,
+           latitude, longitude, altitude, uploaded_by, review_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             photoData.title, photoData.filename, photoData.thumbnail,
             photoData.date, photoData.category, photoData.rotation,
             photoData.cameraMake, photoData.cameraModel, photoData.exposureTime,
             photoData.fNumber, photoData.iso, photoData.focalLength,
             photoData.software, photoData.lensModel, photoData.whiteBalance,
-            photoData.meteringMode, photoData.flash, photoData.colorSpace, uploadedBy, reviewStatus,
+            photoData.meteringMode, photoData.flash, photoData.colorSpace,
+            photoData.latitude, photoData.longitude, photoData.altitude,
+            uploadedBy, reviewStatus,
           ]
         );
 

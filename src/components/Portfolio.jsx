@@ -26,7 +26,7 @@ export default function Portfolio() {
   useEffect(() => {
     const loadInitial = async () => {
       try {
-        const result = await getPhotos({ page: 1, pageSize });
+        const result = await getPhotos({ page: 1, pageSize, scope: 'all' });
         const data = result.data || [];
         cachePhotoList(data);
         setPhotos(data);
@@ -49,7 +49,7 @@ export default function Portfolio() {
     setLoadingMore(true);
     try {
       const nextPage = page + 1;
-      const result = await getPhotos({ page: nextPage, pageSize });
+      const result = await getPhotos({ page: nextPage, pageSize, scope: 'all' });
       const newPhotos = result.data || [];
       
       if (newPhotos.length > 0) {

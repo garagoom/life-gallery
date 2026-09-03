@@ -22,7 +22,7 @@ export default function ProtectedRoute({ children, requiredRole = 'viewer' }) {
     return <Navigate to="/login" replace />;
   }
 
-  const roleHierarchy = { admin: 3, editor: 2, viewer: 1 };
+  const roleHierarchy = { admin: 4, module_admin: 3, creator: 2, viewer: 1 };
   const userRoleLevel = roleHierarchy[user.role] || 0;
   const requiredLevel = roleHierarchy[requiredRole] || 0;
 

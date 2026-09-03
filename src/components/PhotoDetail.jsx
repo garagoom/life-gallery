@@ -94,6 +94,13 @@ export default function PhotoDetail() {
     { label: '软件', value: photo.software },
   ].filter(item => item.value);
 
+  const hasGps = photo?.latitude != null && photo?.longitude != null;
+  const gpsItems = hasGps ? [
+    { label: '纬度', value: photo.latitude?.toFixed(6) },
+    { label: '经度', value: photo.longitude?.toFixed(6) },
+    photo.altitude != null ? { label: '海拔', value: `${Math.round(photo.altitude)}m` } : null,
+  ].filter(Boolean) : [];
+
   const [histogramData, setHistogramData] = useState(null);
   const [creatorCardOpen, setCreatorCardOpen] = useState(false);
   const imgRef = useRef(null);
@@ -183,6 +190,28 @@ export default function PhotoDetail() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {gpsItems.length > 0 && (
+          <div className={styles.exifCard}>
+            <h3 className={styles.exifTitle}>📍 机位信息</h3>
+            <div className={styles.exifGrid}>
+              {gpsItems.map(item => (
+                <div key={item.label} className={styles.exifItem}>
+                  <span className={styles.exifLabel}>{item.label}</span>
+                  <span className={styles.exifValue}>{item.value}</span>
+                </div>
+              ))}
+            </div>
+            <a
+              href={`https://www.google.com/maps?q=${photo.latitude},${photo.longitude}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: 'inline-block', marginTop: 8, fontSize: 13, color: 'var(--accent)' }}
+            >
+              在地图中查看 →
+            </a>
           </div>
         )}
 

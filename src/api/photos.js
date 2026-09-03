@@ -66,6 +66,7 @@ export async function getPhotos(params = {}) {
   if (params.dateTo) searchParams.append('dateTo', params.dateTo);
   if (params.page) searchParams.append('page', params.page);
   if (params.pageSize) searchParams.append('pageSize', params.pageSize);
+  if (params.scope) searchParams.append('scope', params.scope);
   
   const queryString = searchParams.toString();
   const url = `${API_BASE}/photos${queryString ? '?' + queryString : ''}`;

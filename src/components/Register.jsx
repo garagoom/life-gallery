@@ -16,10 +16,18 @@ export default function Register() {
   const handleSubmit = async (values) => {
     setLoading(true);
     try {
+      const trimmed = {
+        ...values,
+        username: values.username?.trim(),
+        password: values.password?.trim(),
+        displayName: values.displayName?.trim(),
+        email: values.email?.trim(),
+        bio: values.bio?.trim(),
+      };
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
+        body: JSON.stringify(trimmed),
       });
       const data = await res.json();
       if (data.code === 200) {

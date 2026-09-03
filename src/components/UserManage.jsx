@@ -23,10 +23,10 @@ export default function UserManage() {
     setLoading(true);
     try {
       const result = await getUsers({ page, pageSize });
-      setUsers(result.data);
-      setPagination(result.pagination);
+      setUsers(result?.data || []);
+      setPagination(result?.pagination || { page, pageSize, total: 0, totalPages: 0 });
     } catch (error) {
-      message.error(error.message || '加载用户失败');
+      message.error(error?.message || '加载用户失败');
     } finally {
       setLoading(false);
     }
@@ -86,25 +86,22 @@ export default function UserManage() {
     setSubmitting(true);
     try {
       const values = await form.validateFields();
+      const trimmed = {
+        displayName: values.displayName?.trim(),
+        email: values.email?.trim(),
+        role: values.role,
+        gender: values.gender,
+        bio: values.bio?.trim(),
+      };
       
       if (editingUser) {
-        await updateUser(editingUser.id, {
-          displayName: values.displayName,
-          email: values.email,
-          role: values.role,
-          gender: values.gender,
-          bio: values.bio,
-        });
+        await updateUser(editingUser.id, trimmed);
         message.success('更新成功');
       } else {
         await createUser({
-          username: values.username,
-          password: values.password,
-          displayName: values.displayName,
-          email: values.email,
-          role: values.role,
-          gender: values.gender,
-          bio: values.bio,
+          username: values.username?.trim(),
+          password: values.password?.trim(),
+          ...trimmed,
         });
         message.success('创建成功');
       }
@@ -234,7 +231,7 @@ export default function UserManage() {
           dataSource={users}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 900 }}
+          scroll={{ x: 900, y: 'calc(100vh - 160px)' }}
           pagination={{
             current: pagination.page,
             pageSize: pagination.pageSize,

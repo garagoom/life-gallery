@@ -174,7 +174,7 @@ export default function ReviewManage() {
             showTotal: (total) => `共 ${total} 张`,
             onChange: (page, pageSize) => loadPhotos(page, pageSize, statusFilter),
           }}
-          scroll={{ x: 800 }}
+          scroll={{ x: 800, y: 'calc(100vh - 200px)' }}
         />
       </div>
     </div>

@@ -191,7 +191,7 @@ export default function RoleManage() {
         <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新建角色</Button>
       </div>
       <div className={styles.tableWrap}>
-        <Table columns={columns} dataSource={roles} rowKey="id" loading={loading} pagination={false} scroll={{ x: 600 }} />
+        <Table columns={columns} dataSource={roles} rowKey="id" loading={loading} pagination={false} scroll={{ x: 600, y: 'calc(100vh - 160px)' }} />
       </div>
 
       <Modal

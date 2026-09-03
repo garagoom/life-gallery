@@ -65,6 +65,9 @@ async function initDb() {
   addColumnIfNotExists('flash', 'TEXT');
   addColumnIfNotExists('color_space', 'TEXT');
   addColumnIfNotExists('histogram', 'TEXT');
+  addColumnIfNotExists('latitude', 'REAL');
+  addColumnIfNotExists('longitude', 'REAL');
+  addColumnIfNotExists('altitude', 'REAL');
 
   // Add user profile columns if they don't exist
   const addUserColumnIfNotExists = (columnName, columnType) => {

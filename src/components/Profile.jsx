@@ -190,7 +190,7 @@ export default function Profile() {
   ];
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} style={{ overflow: 'auto' }}>
       <div className={styles.header}>
         <h2 className={styles.title}>个人信息</h2>
       </div>

@@ -111,7 +111,7 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/photography/admin" element={
-            <ProtectedRoute requiredRole="editor">
+            <ProtectedRoute requiredRole="module_admin">
               <Admin />
             </ProtectedRoute>
           } />
@@ -137,9 +137,7 @@ function App() {
           } />
           <Route path="/photography/profile" element={
             <ProtectedRoute>
-              <div style={{ height: '100%', overflow: 'auto', paddingBottom: '80px' }}>
-                <Profile />
-              </div>
+              <Profile />
             </ProtectedRoute>
           } />
 

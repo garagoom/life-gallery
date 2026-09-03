@@ -40,7 +40,7 @@ export default function Login() {
   const handleSubmit = async (values) => {
     setLoading(true);
     try {
-      await doLogin(values.username, values.password);
+      await doLogin(values.username.trim(), values.password.trim());
     } catch (error) {
       message.error(error.message || '登录失败');
     } finally {

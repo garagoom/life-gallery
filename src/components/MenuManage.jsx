@@ -171,7 +171,7 @@ export default function MenuManage() {
           rowKey="id"
           loading={loading}
           pagination={false}
-          scroll={{ x: 800 }}
+          scroll={{ x: 800, y: 'calc(100vh - 160px)' }}
           childrenColumnName="children"
           expandable={{ defaultExpandAllRows: true }}
         />
