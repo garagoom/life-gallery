@@ -7,6 +7,14 @@ export default defineConfig({
     dedupe: ['react', 'react-dom'],
   },
   server: {
+    port: 5173,
+    strictPort: true,
+    hmr: {
+      protocol: 'ws',
+      host: 'localhost',
+      port: 5173,
+      clientPort: 5173,
+    },
     proxy: {
       '/api': 'http://localhost:3001',
       '/uploads': 'http://localhost:3001',

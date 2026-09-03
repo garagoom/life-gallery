@@ -1,8 +1,12 @@
 .container {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
   z-index: 1000;
+  touch-action: none;
+  user-select: none;
+}
+
+.dragging {
+  z-index: 1001;
 }
 
 .mainButton {
@@ -14,14 +18,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
+  cursor: grab;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .mainButton:hover {
   transform: scale(1.05);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.dragging .mainButton,
+.dragging .mainButton:hover {
+  cursor: grabbing;
+  transform: none;
+  transition: none;
 }
 
 .moduleIcon {

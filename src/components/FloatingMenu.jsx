@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Popover, Dropdown, Avatar, Menu, Divider, Typography } from 'antd';
 import {
@@ -17,6 +17,31 @@ import { iconMap } from '../utils/icons';
 import styles from './FloatingMenu.module.css';
 
 const { Text } = Typography;
+const BUTTON_SIZE = 56;
+const STORAGE_KEY = 'life-gallery:floating-menu-pos-v2';
+
+function readStoredPos() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.x === 'number' && typeof parsed?.y === 'number') return parsed;
+  } catch {}
+  return null;
+}
+
+function clampPos(x, y) {
+  const maxX = Math.max(8, window.innerWidth - BUTTON_SIZE - 8);
+  const maxY = Math.max(8, window.innerHeight - BUTTON_SIZE - 8);
+  return {
+    x: Math.min(maxX, Math.max(8, x)),
+    y: Math.min(maxY, Math.max(8, y)),
+  };
+}
+
+function defaultPos() {
+  return clampPos(window.innerWidth - BUTTON_SIZE - 24, window.innerHeight - BUTTON_SIZE - 96);
+}
 
 const fallbackModules = [
   {
@@ -68,6 +93,29 @@ export default function FloatingMenu() {
   const { user, loginUser } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
   const [modules, setModules] = useState(fallbackModules);
+  const [pos, setPos] = useState(() => {
+    const stored = readStoredPos();
+    return stored ? clampPos(stored.x, stored.y) : defaultPos();
+  });
+  const [dragging, setDragging] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const skipOpenRef = useRef(false);
+  const dragRef = useRef({
+    pointerId: null,
+    moved: false,
+    startX: 0,
+    startY: 0,
+    origX: 0,
+    origY: 0,
+  });
+
+  useEffect(() => {
+    const onResize = () => {
+      setPos((current) => clampPos(current.x, current.y));
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -76,6 +124,67 @@ export default function FloatingMenu() {
       if (tree.length > 0) setModules(tree);
     }).catch(() => {});
   }, [user]);
+
+  const handlePointerDown = (event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const pointerId = event.pointerId;
+    dragRef.current = {
+      pointerId,
+      moved: false,
+      startX: event.clientX,
+      startY: event.clientY,
+      origX: pos.x,
+      origY: pos.y,
+    };
+
+    const onMove = (moveEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
+      const drag = dragRef.current;
+      const dx = moveEvent.clientX - drag.startX;
+      const dy = moveEvent.clientY - drag.startY;
+      if (!drag.moved && dx * dx + dy * dy < 25) return;
+      drag.moved = true;
+      setDragging(true);
+      setMenuOpen(false);
+      setPos(clampPos(drag.origX + dx, drag.origY + dy));
+    };
+
+    const onUp = (upEvent) => {
+      if (upEvent.pointerId !== pointerId) return;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      const wasDrag = dragRef.current.moved;
+      dragRef.current.pointerId = null;
+      dragRef.current.moved = false;
+      setDragging(false);
+      if (wasDrag) {
+        setPos((current) => {
+          const next = clampPos(current.x, current.y);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+          return next;
+        });
+        skipOpenRef.current = true;
+        window.setTimeout(() => {
+          skipOpenRef.current = false;
+        }, 250);
+      }
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  };
+
+  const handleOpenChange = (open) => {
+    if (dragging || dragRef.current.pointerId != null || skipOpenRef.current) {
+      if (!open) setMenuOpen(false);
+      return;
+    }
+    setMenuOpen(open);
+  };
 
   if (!user) {
     navigate('/login', { replace: true });
@@ -203,15 +312,24 @@ export default function FloatingMenu() {
   );
 
   return (
-    <div className={styles.container}>
+    <div
+      className={`${styles.container}${dragging ? ` ${styles.dragging}` : ''}`}
+      style={{ left: pos.x, top: pos.y }}
+    >
       <Popover
         content={popoverContent}
-        trigger="hover"
+        trigger="click"
         placement="topRight"
         overlayClassName={styles.popover}
         arrow={false}
+        open={menuOpen}
+        onOpenChange={handleOpenChange}
       >
-        <div className={styles.mainButton}>
+        <div
+          className={styles.mainButton}
+          title="拖动可移动，点击打开菜单"
+          onPointerDown={handlePointerDown}
+        >
           <div className={styles.moduleIcon}>
             {currentModule.icon}
           </div>

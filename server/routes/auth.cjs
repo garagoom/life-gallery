@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const sharp = require('sharp');
 const { getDb, saveDb } = require('../db.cjs');
-const { generateTokens, verifyRefreshToken, authMiddleware, REFRESH_TOKEN_EXPIRES } = require('../middleware/auth.cjs');
+const { generateTokens, verifyRefreshToken, verifyAccessToken, authMiddleware, REFRESH_TOKEN_EXPIRES } = require('../middleware/auth.cjs');
 
 const router = express.Router();
 
@@ -65,13 +65,23 @@ router.post('/login', (req, res) => {
       return res.status(401).json({ code: 401, message: '用户名或密码错误', data: null });
     }
     
-    // Single session: check if already logged in elsewhere
+    // Single session: only conflict if another live session still exists
     if (user.login_session && !force) {
-      return res.status(409).json({
-        code: 409,
-        message: '该账号已在其他设备登录，是否踢出对方？',
-        data: { sessionId: user.login_session }
-      });
+      const activeStmt = db.prepare(
+        'SELECT COUNT(*) as count FROM refresh_tokens WHERE user_id = ? AND expires_at > ?'
+      );
+      activeStmt.bind([user.id, new Date().toISOString()]);
+      activeStmt.step();
+      const activeCount = activeStmt.getAsObject().count;
+      activeStmt.free();
+
+      if (activeCount > 0) {
+        return res.status(409).json({
+          code: 409,
+          message: '该账号已在其他设备登录，是否踢出对方？',
+          data: { sessionId: user.login_session }
+        });
+      }
     }
     
     // Generate new session ID
@@ -232,22 +242,37 @@ router.post('/refresh', (req, res) => {
   }
 });
 
-router.post('/logout', authMiddleware, (req, res) => {
+router.post('/logout', (req, res) => {
   try {
     const { refreshToken } = req.body;
     const db = getDb();
-    
-    // Delete refresh token from database
-    if (refreshToken) {
-      db.run('DELETE FROM refresh_tokens WHERE token = ? AND user_id = ?', 
-        [refreshToken, req.user.id]);
-    } else {
-      // Delete all refresh tokens for this user
-      db.run('DELETE FROM refresh_tokens WHERE user_id = ?', [req.user.id]);
+    let userId = null;
+
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const decoded = verifyAccessToken(authHeader.split(' ')[1]);
+        if (decoded?.type === 'access') userId = decoded.id;
+      } catch {
+        // access token may already be expired; fall back to refresh token
+      }
     }
-    
-    saveDb();
-    
+
+    if (!userId && refreshToken) {
+      const stmt = db.prepare('SELECT user_id FROM refresh_tokens WHERE token = ?');
+      stmt.bind([refreshToken]);
+      if (stmt.step()) {
+        userId = stmt.getAsObject().user_id;
+      }
+      stmt.free();
+    }
+
+    if (userId) {
+      db.run('DELETE FROM refresh_tokens WHERE user_id = ?', [userId]);
+      db.run('UPDATE users SET login_session = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [userId]);
+      saveDb();
+    }
+
     res.json({ code: 200, message: '退出登录成功', data: null });
   } catch (error) {
     console.error('Logout error:', error);
