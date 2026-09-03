@@ -182,7 +182,7 @@ async function initDb() {
   // Insert default roles
   db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('admin', '超级管理员', 4)`);
   db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('module_admin', '模块管理员', 3)`);
-  db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('creator', '摄影创作者', 2)`);
+  db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('creator', '创作者', 2)`);
   db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('viewer', '访客', 1)`);
 
   // Insert default menus
@@ -222,7 +222,7 @@ async function initDb() {
   const dicts = [
     ['role', 'admin', '超级管理员', 'red', 4, 1],
     ['role', 'module_admin', '模块管理员', 'orange', 3, 2],
-    ['role', 'creator', '摄影创作者', 'blue', 2, 3],
+    ['role', 'creator', '创作者', 'blue', 2, 3],
     ['role', 'viewer', '访客', 'default', 1, 4],
     ['review_status', '0', '待审核', 'orange', null, 1],
     ['review_status', '1', '已通过', 'green', null, 2],

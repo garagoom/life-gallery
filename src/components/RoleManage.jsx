@@ -139,14 +139,15 @@ export default function RoleManage() {
       align: 'center',
     },
     {
-      title: '角色名',
-      dataIndex: 'name',
-      key: 'name',
-    },
-    {
-      title: '标签',
+      title: '角色',
       dataIndex: 'label',
       key: 'label',
+    },
+    {
+      title: '标识',
+      dataIndex: 'name',
+      key: 'name',
+      render: (v) => <span style={{ color: 'var(--text-secondary)' }}>{v}</span>,
     },
     {
       title: '等级',
