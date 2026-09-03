@@ -1,10 +1,16 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { UserOutlined, ClockCircleOutlined } from '@ant-design/icons';
-import { getPhotoUrl } from '../data/photos';
+import { getPhotoUrl, getThumbnailUrl } from '../data/photos';
+import { prefetchImage, isImageLoaded } from '../utils/imageCache';
 import ExifInfo from './ExifInfo';
 import styles from './RetroLightbox.module.css';
 
 export default function RetroLightbox({ photo, photos, onClose, onNavigate }) {
+  const [displayPhoto, setDisplayPhoto] = useState(photo);
+  const [displaySrc, setDisplaySrc] = useState(
+    () => (photo && isImageLoaded(getPhotoUrl(photo)) ? getPhotoUrl(photo) : getThumbnailUrl(photo))
+  );
+
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Escape') onClose();
     if (e.key === 'ArrowLeft') onNavigate('prev');
@@ -19,6 +25,33 @@ export default function RetroLightbox({ photo, photos, onClose, onNavigate }) {
       document.body.style.overflow = 'unset';
     };
   }, [handleKeyDown]);
+
+  useEffect(() => {
+    if (!photo) return;
+    let cancelled = false;
+    const full = getPhotoUrl(photo);
+
+    const apply = () => {
+      if (cancelled) return;
+      setDisplayPhoto(photo);
+      setDisplaySrc(full);
+    };
+
+    if (isImageLoaded(full)) apply();
+    else prefetchImage(full).then(apply);
+
+    if (photos?.length) {
+      const idx = photos.findIndex((p) => p.id === photo.id);
+      if (idx >= 0) {
+        const prev = photos[(idx - 1 + photos.length) % photos.length];
+        const next = photos[(idx + 1) % photos.length];
+        prefetchImage(getPhotoUrl(prev));
+        prefetchImage(getPhotoUrl(next));
+      }
+    }
+
+    return () => { cancelled = true; };
+  }, [photo, photos]);
 
   if (!photo) return null;
 
@@ -38,51 +71,54 @@ export default function RetroLightbox({ photo, photos, onClose, onNavigate }) {
     return `${y}.${m}.${day}`;
   };
 
+  const shown = displayPhoto || photo;
+
   return (
     <div className={styles.overlay} onClick={handleBackdropClick}>
       <div className={styles.container}>
-        <button 
+        <button
           className={`${styles.navButton} ${styles.prev}`}
           onClick={() => onNavigate('prev')}
           aria-label="Previous photo"
         >
           ‹
         </button>
-        
+
         <div className={styles.cardWrapper}>
           <div className={styles.card}>
-            <div 
+            <div
               className={styles.photoFrame}
-              style={{ transform: `rotate(${photo.rotation}deg)` }}
+              style={{ transform: `rotate(${shown.rotation || 0}deg)` }}
             >
-              <img 
-                src={getPhotoUrl(photo)} 
-                alt={photo.title}
+              <img
+                src={displaySrc}
+                alt={shown.title}
                 className={styles.image}
+                decoding="async"
               />
-              <ExifInfo photo={photo} />
+              <ExifInfo photo={shown} />
             </div>
           </div>
-          
-          {(photo.uploader_display_name || photo.uploaded_by || photo.date) && (
+
+          {(shown.uploader_display_name || shown.uploaded_by || shown.date) && (
             <div className={styles.meta}>
-              {(photo.uploader_display_name || photo.uploaded_by) && (
+              {(shown.uploader_display_name || shown.uploaded_by) && (
                 <div className={styles.metaLine}>
                   <UserOutlined className={styles.metaIcon} />
-                  <span>{photo.uploader_display_name || photo.uploaded_by}</span>
+                  <span>{shown.uploader_display_name || shown.uploaded_by}</span>
                 </div>
               )}
-              {photo.date && (
+              {shown.date && (
                 <div className={styles.metaLine}>
                   <ClockCircleOutlined className={styles.metaIcon} />
-                  <span>{formatTime(photo.date)}</span>
+                  <span>{formatTime(shown.date)}</span>
                 </div>
               )}
             </div>
           )}
         </div>
-        
-        <button 
+
+        <button
           className={`${styles.navButton} ${styles.next}`}
           onClick={() => onNavigate('next')}
           aria-label="Next photo"
@@ -90,7 +126,7 @@ export default function RetroLightbox({ photo, photos, onClose, onNavigate }) {
           ›
         </button>
       </div>
-      
+
       <div className={styles.hint}>
         ESC 关闭 | ← → 切换
       </div>

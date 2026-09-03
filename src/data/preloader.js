@@ -1,18 +1,25 @@
 import { useRef, useEffect } from 'react';
 import { getRandomPhotos } from '../api/photos';
-import { getPhotoUrl } from './photos';
+import { getThumbnailUrl } from './photos';
 import { isAuthenticated } from '../api/auth';
+import { prefetchImages } from '../utils/imageCache';
 
 const CACHE_KEY = 'preloadedPhotos';
 const CACHE_TS_KEY = 'preloadedPhotosTs';
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 5 * 60 * 1000;
 
 let preloadPromise = null;
+
+function cachePhotoJson(photos) {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify(photos));
+    sessionStorage.setItem(CACHE_TS_KEY, String(Date.now()));
+  } catch { /* quota exceeded */ }
+}
 
 function doPreload() {
   if (preloadPromise) return preloadPromise;
 
-  // Skip preload if not logged in — API will return 401 and cause redirect loop
   if (!isAuthenticated()) {
     return Promise.resolve([]);
   }
@@ -26,23 +33,11 @@ function doPreload() {
         return photos;
       }
 
-      // Preload images into browser cache
-      await Promise.allSettled(
-        photos.map((photo) =>
-          new Promise((resolve) => {
-            const img = new Image();
-            img.onload = resolve;
-            img.onerror = resolve;
-            img.src = getPhotoUrl(photo);
-          })
-        )
-      );
+      cachePhotoJson(photos);
 
-      // Cache photo data
-      try {
-        sessionStorage.setItem(CACHE_KEY, JSON.stringify(photos));
-        sessionStorage.setItem(CACHE_TS_KEY, String(Date.now()));
-      } catch (e) { /* quota exceeded, ignore */ }
+      const thumbs = photos.map(getThumbnailUrl);
+      await prefetchImages(thumbs.slice(0, 5));
+      prefetchImages(thumbs.slice(5));
 
       return photos;
     } catch (err) {
