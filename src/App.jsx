@@ -111,27 +111,27 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/photography/admin" element={
-            <ProtectedRoute requiredRole="module_admin">
+            <ProtectedRoute>
               <Admin />
             </ProtectedRoute>
           } />
           <Route path="/photography/admin/review" element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute>
               <ReviewManage />
             </ProtectedRoute>
           } />
           <Route path="/photography/admin/users" element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute>
               <UserManage />
             </ProtectedRoute>
           } />
           <Route path="/photography/admin/roles" element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute>
               <RoleManage />
             </ProtectedRoute>
           } />
           <Route path="/photography/admin/menus" element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute>
               <MenuManage />
             </ProtectedRoute>
           } />
