@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, InputNumber, Select, Switch, Space, message, Popconfirm } from 'antd';
+import { Table, Button, Modal, Form, Input, InputNumber, Select, Space, message, Popconfirm } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useDict } from '../contexts/DictContext';
+import { iconList, getIcon } from '../utils/icons';
 import styles from './Admin.module.css';
 
 export default function MenuManage() {
@@ -141,8 +142,9 @@ export default function MenuManage() {
       title: '图标',
       dataIndex: 'icon',
       key: 'icon',
-      width: 120,
-      render: (text) => text || '-',
+      width: 80,
+      align: 'center',
+      render: (text) => text ? <span style={{ fontSize: 16 }}>{getIcon(text)}</span> : '-',
     },
     {
       title: '路径',
@@ -233,7 +235,21 @@ export default function MenuManage() {
             </Select>
           </Form.Item>
           <Form.Item name="icon" label="图标">
-            <Input placeholder="输入图标名" />
+            <Select
+              showSearch
+              placeholder="选择图标"
+              allowClear
+              optionFilterProp="label"
+              options={iconList.map(item => ({
+                label: (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </span>
+                ),
+                value: item.value,
+              }))}
+            />
           </Form.Item>
           <Form.Item name="path" label="路径">
             <Input placeholder="输入路径" />

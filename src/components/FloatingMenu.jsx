@@ -7,33 +7,16 @@ import {
   LogoutOutlined,
   SettingOutlined,
   HomeOutlined,
-  TeamOutlined,
   PictureOutlined,
-  SafetyOutlined,
-  MenuOutlined,
   AppstoreOutlined,
-  AuditOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { logout } from '../api/auth';
 import { getMyMenus } from '../api/menus';
+import { iconMap } from '../utils/icons';
 import styles from './FloatingMenu.module.css';
 
 const { Text } = Typography;
-
-const iconMap = {
-  CameraOutlined: <CameraOutlined />,
-  UserOutlined: <UserOutlined />,
-  LogoutOutlined: <LogoutOutlined />,
-  SettingOutlined: <SettingOutlined />,
-  HomeOutlined: <HomeOutlined />,
-  TeamOutlined: <TeamOutlined />,
-  PictureOutlined: <PictureOutlined />,
-  SafetyOutlined: <SafetyOutlined />,
-  MenuOutlined: <MenuOutlined />,
-  AppstoreOutlined: <AppstoreOutlined />,
-  AuditOutlined: <AuditOutlined />,
-};
 
 const fallbackModules = [
   {
