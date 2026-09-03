@@ -4,6 +4,7 @@ import { getPhotoById } from '../api/photos';
 import { getPhotoUrl } from '../data/photos';
 import { getCachedPhoto, cachePhoto } from '../utils/imageCache';
 import { extractHistogram } from '../utils/extractHistogram';
+import { formatMeteringMode, formatWhiteBalance, formatExposureBias } from '../utils/exifFormat';
 import CreatorCard from './CreatorCard';
 import styles from './PhotoDetail.module.css';
 
@@ -118,19 +119,13 @@ export default function PhotoDetail({ overlay = false }) {
     { label: '光圈', value: photo.f_number },
     { label: '快门速度', value: photo.exposure_time },
     { label: 'ISO', value: photo.iso },
+    { label: '曝光补偿', value: formatExposureBias(photo.exposure_bias) },
     { label: '焦距', value: photo.focal_length },
-    { label: '白平衡', value: photo.white_balance },
-    { label: '测光模式', value: photo.metering_mode },
+    { label: '白平衡', value: formatWhiteBalance(photo.white_balance) },
+    { label: '测光模式', value: formatMeteringMode(photo.metering_mode) },
     { label: '闪光灯', value: photo.flash },
     { label: '软件', value: photo.software },
   ].filter(item => item.value);
-
-  const hasGps = photo?.latitude != null && photo?.longitude != null;
-  const gpsItems = hasGps ? [
-    { label: '纬度', value: photo.latitude?.toFixed(6) },
-    { label: '经度', value: photo.longitude?.toFixed(6) },
-    photo.altitude != null ? { label: '海拔', value: `${Math.round(photo.altitude)}m` } : null,
-  ].filter(Boolean) : [];
 
   return (
     <div ref={overlayRef} className={overlay ? `${styles.page} ${styles.overlay}` : styles.page}>
@@ -204,28 +199,6 @@ export default function PhotoDetail({ overlay = false }) {
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {gpsItems.length > 0 && (
-          <div className={styles.exifCard}>
-            <h3 className={styles.exifTitle}>📍 机位信息</h3>
-            <div className={styles.exifGrid}>
-              {gpsItems.map(item => (
-                <div key={item.label} className={styles.exifItem}>
-                  <span className={styles.exifLabel}>{item.label}</span>
-                  <span className={styles.exifValue}>{item.value}</span>
-                </div>
-              ))}
-            </div>
-            <a
-              href={`https://www.google.com/maps?q=${photo.latitude},${photo.longitude}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ display: 'inline-block', marginTop: 8, fontSize: 13, color: 'var(--accent)' }}
-            >
-              在地图中查看 →
-            </a>
           </div>
         )}
 

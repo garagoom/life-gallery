@@ -36,6 +36,7 @@ async function initDb() {
       lens_model TEXT,
       white_balance TEXT,
       metering_mode TEXT,
+      exposure_bias TEXT,
       flash TEXT,
       color_space TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -62,6 +63,7 @@ async function initDb() {
   addColumnIfNotExists('lens_model', 'TEXT');
   addColumnIfNotExists('white_balance', 'TEXT');
   addColumnIfNotExists('metering_mode', 'TEXT');
+  addColumnIfNotExists('exposure_bias', 'TEXT');
   addColumnIfNotExists('flash', 'TEXT');
   addColumnIfNotExists('color_space', 'TEXT');
   addColumnIfNotExists('histogram', 'TEXT');

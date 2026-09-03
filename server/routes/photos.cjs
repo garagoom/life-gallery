@@ -101,15 +101,7 @@ function formatDateValue(dateValue) {
   return null;
 }
 
-// Convert GPS DMS (degrees/minutes/seconds) to decimal
-function dmsToDecimal(dms, ref) {
-  if (!dms || !Array.isArray(dms) || dms.length < 3) return null;
-  let decimal = dms[0] + dms[1] / 60 + dms[2] / 3600;
-  if (ref === 'S' || ref === 'W') decimal = -decimal;
-  return Math.round(decimal * 1000000) / 1000000;
-}
-
-// Extract EXIF data from image
+// Extract EXIF data from image (GPS is intentionally skipped for now)
 async function extractExif(filePath) {
   try {
     const metadata = await sharp(filePath).metadata();
@@ -126,18 +118,6 @@ async function extractExif(filePath) {
     const image = exifData.Image || {};
     const photo = exifData.Photo || {};
     const exifIFD = exifData.exif || {};
-    const gps = exifData.GPSInfo || {};
-    
-    // Extract GPS coordinates
-    let latitude = null, longitude = null, altitude = null;
-    if (gps.GPSLatitude && gps.GPSLongitude) {
-      latitude = dmsToDecimal(gps.GPSLatitude, gps.GPSLatitudeRef);
-      longitude = dmsToDecimal(gps.GPSLongitude, gps.GPSLongitudeRef);
-    }
-    if (gps.GPSAltitude) {
-      altitude = typeof gps.GPSAltitude === 'number' ? gps.GPSAltitude : null;
-      if (gps.GPSAltitudeRef === 1 && altitude) altitude = -altitude;
-    }
     
     return {
       make: image.Make || null,
@@ -151,13 +131,11 @@ async function extractExif(filePath) {
       height: metadata.height,
       software: image.Software || null,
       lensModel: photo.LensModel || exifIFD.LensModel || null,
-      whiteBalance: photo.WhiteBalance || exifIFD.WhiteBalance || null,
-      meteringMode: photo.MeteringMode || exifIFD.MeteringMode || null,
-      flash: photo.Flash || exifIFD.Flash || null,
+      whiteBalance: photo.WhiteBalance ?? exifIFD.WhiteBalance ?? null,
+      meteringMode: photo.MeteringMode ?? exifIFD.MeteringMode ?? null,
+      exposureBias: photo.ExposureBiasValue ?? photo.ExposureCompensation ?? exifIFD.ExposureBiasValue ?? null,
+      flash: photo.Flash ?? exifIFD.Flash ?? null,
       colorSpace: photo.ColorSpace || exifIFD.ColorSpace || null,
-      latitude,
-      longitude,
-      altitude,
     };
   } catch (error) {
     console.error('EXIF extraction error:', error);
@@ -165,8 +143,7 @@ async function extractExif(filePath) {
       make: null, model: null, exposureTime: null, fNumber: null,
       iso: null, focalLength: null, dateTime: null, width: null,
       height: null, software: null, lensModel: null, whiteBalance: null,
-      meteringMode: null, flash: null, colorSpace: null,
-      latitude: null, longitude: null, altitude: null,
+      meteringMode: null, exposureBias: null, flash: null, colorSpace: null,
     };
   }
 }
@@ -198,6 +175,47 @@ function formatExif(exif) {
     return `${Math.round(fl)}mm`;
   };
 
+  const meteringLabels = {
+    0: '未知', 1: '平均测光', 2: '中央重点测光', 3: '点测光',
+    4: '多点测光', 5: '评价测光', 6: '局部测光', 255: '其他',
+  };
+  const formatMetering = (mode) => {
+    if (mode == null || mode === '') return null;
+    const num = Number(mode);
+    if (Number.isFinite(num) && meteringLabels[num] != null) return meteringLabels[num];
+    return String(mode);
+  };
+
+  const formatWhiteBalance = (wb) => {
+    if (wb == null || wb === '') return null;
+    const num = Number(wb);
+    if (num === 0) return '自动';
+    if (num === 1) return '手动';
+    return String(wb);
+  };
+
+  const formatExposureBias = (val) => {
+    if (val == null || val === '') return null;
+    let num;
+    if (typeof val === 'object' && val.numerator != null && val.denominator) {
+      num = val.numerator / val.denominator;
+    } else {
+      num = Number(val);
+    }
+    if (!Number.isFinite(num)) return null;
+    if (Math.abs(num) < 0.01) return '0 EV';
+    const thirds = Math.round(num * 3);
+    if (Math.abs(num * 3 - thirds) < 0.08) {
+      const sign = thirds > 0 ? '+' : '-';
+      const abs = Math.abs(thirds);
+      if (abs % 3 === 0) return `${sign}${abs / 3} EV`;
+      return `${sign}${abs}/3 EV`;
+    }
+    const rounded = Math.round(num * 10) / 10;
+    const sign = rounded > 0 ? '+' : '';
+    return `${sign}${String(rounded)} EV`;
+  };
+
   return {
     make: exif.make,
     model: exif.model,
@@ -210,13 +228,11 @@ function formatExif(exif) {
     height: exif.height,
     software: exif.software,
     lensModel: exif.lensModel,
-    whiteBalance: exif.whiteBalance,
-    meteringMode: exif.meteringMode,
+    whiteBalance: formatWhiteBalance(exif.whiteBalance),
+    meteringMode: formatMetering(exif.meteringMode),
+    exposureBias: formatExposureBias(exif.exposureBias),
     flash: exif.flash,
     colorSpace: exif.colorSpace,
-    latitude: exif.latitude,
-    longitude: exif.longitude,
-    altitude: exif.altitude,
   };
 }
 
@@ -278,11 +294,12 @@ async function processPhoto(file, title, date, category) {
     lensModel: formattedExif.lensModel,
     whiteBalance: formattedExif.whiteBalance,
     meteringMode: formattedExif.meteringMode,
+    exposureBias: formattedExif.exposureBias,
     flash: formattedExif.flash,
     colorSpace: formattedExif.colorSpace,
-    latitude: formattedExif.latitude,
-    longitude: formattedExif.longitude,
-    altitude: formattedExif.altitude,
+    latitude: null,
+    longitude: null,
+    altitude: null,
   };
 }
 
@@ -568,16 +585,16 @@ router.post('/', authMiddleware, requireMenu('admin'), upload.single('file'), as
     db.run(
       `INSERT INTO photos (title, filename, thumbnail, date, category, rotation, 
        camera_make, camera_model, exposure_time, f_number, iso, focal_length,
-       software, lens_model, white_balance, metering_mode, flash, color_space, 
+       software, lens_model, white_balance, metering_mode, exposure_bias, flash, color_space, 
        latitude, longitude, altitude, uploaded_by, review_status) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         photoData.title, photoData.filename, photoData.thumbnail,
         photoData.date, photoData.category, photoData.rotation,
         photoData.cameraMake, photoData.cameraModel, photoData.exposureTime,
         photoData.fNumber, photoData.iso, photoData.focalLength,
         photoData.software, photoData.lensModel, photoData.whiteBalance,
-        photoData.meteringMode, photoData.flash, photoData.colorSpace,
+        photoData.meteringMode, photoData.exposureBias, photoData.flash, photoData.colorSpace,
         photoData.latitude, photoData.longitude, photoData.altitude,
         uploadedBy, reviewStatus,
       ]
@@ -618,16 +635,16 @@ router.post('/batch', authMiddleware, requireMenu('admin'), upload.array('files'
         db.run(
           `INSERT INTO photos (title, filename, thumbnail, date, category, rotation,
            camera_make, camera_model, exposure_time, f_number, iso, focal_length,
-           software, lens_model, white_balance, metering_mode, flash, color_space,
+           software, lens_model, white_balance, metering_mode, exposure_bias, flash, color_space,
            latitude, longitude, altitude, uploaded_by, review_status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             photoData.title, photoData.filename, photoData.thumbnail,
             photoData.date, photoData.category, photoData.rotation,
             photoData.cameraMake, photoData.cameraModel, photoData.exposureTime,
             photoData.fNumber, photoData.iso, photoData.focalLength,
             photoData.software, photoData.lensModel, photoData.whiteBalance,
-            photoData.meteringMode, photoData.flash, photoData.colorSpace,
+            photoData.meteringMode, photoData.exposureBias, photoData.flash, photoData.colorSpace,
             photoData.latitude, photoData.longitude, photoData.altitude,
             uploadedBy, reviewStatus,
           ]
