@@ -8,7 +8,7 @@ const { requireMenu } = require('../middleware/permission.cjs');
 router.get('/', authMiddleware, requireMenu('menus'), (req, res) => {
   try {
     const db = getDb();
-    const menus = db.exec(`SELECT * FROM menus ORDER BY sort_order ASC`)[0];
+    const menus = db.exec(`SELECT id, parent_id, key, label, icon, path, sort_order, status, created_at, updated_at, type, visible FROM menus ORDER BY sort_order ASC`)[0];
     
     const list = menus ? menus.values.map(row => ({
       id: row[0],
@@ -17,12 +17,12 @@ router.get('/', authMiddleware, requireMenu('menus'), (req, res) => {
       label: row[3],
       icon: row[4],
       path: row[5],
-      type: row[6],
-      visible: row[7],
-      sort_order: row[8],
-      status: row[9],
-      created_at: row[10],
-      updated_at: row[11]
+      sort_order: row[6],
+      status: row[7],
+      created_at: row[8],
+      updated_at: row[9],
+      type: row[10] || 'menu',
+      visible: row[11] !== undefined ? row[11] : 1
     })) : [];
 
     // 构建树形结构
@@ -49,7 +49,7 @@ router.get('/', authMiddleware, requireMenu('menus'), (req, res) => {
 router.get('/flat', authMiddleware, requireMenu('menus'), (req, res) => {
   try {
     const db = getDb();
-    const menus = db.exec(`SELECT * FROM menus ORDER BY sort_order ASC`)[0];
+    const menus = db.exec(`SELECT id, parent_id, key, label, icon, path, sort_order, status, type, visible FROM menus ORDER BY sort_order ASC`)[0];
     
     const list = menus ? menus.values.map(row => ({
       id: row[0],
@@ -58,10 +58,10 @@ router.get('/flat', authMiddleware, requireMenu('menus'), (req, res) => {
       label: row[3],
       icon: row[4],
       path: row[5],
-      type: row[6],
-      visible: row[7],
-      sort_order: row[8],
-      status: row[9]
+      sort_order: row[6],
+      status: row[7],
+      type: row[8] || 'menu',
+      visible: row[9] !== undefined ? row[9] : 1
     })) : [];
 
     res.json({ code: 200, message: 'success', data: list });
@@ -75,7 +75,7 @@ router.get('/my', authMiddleware, (req, res) => {
   try {
     const db = getDb();
     const menus = db.exec(`
-      SELECT DISTINCT m.id, m.parent_id, m.key, m.label, m.icon, m.path, m.type, m.visible, m.sort_order
+      SELECT DISTINCT m.id, m.parent_id, m.key, m.label, m.icon, m.path, m.sort_order, m.type, m.visible
       FROM menus m
       JOIN role_permissions rp ON m.id = rp.menu_id
       JOIN users u ON rp.role_id = u.role_id
@@ -90,9 +90,9 @@ router.get('/my', authMiddleware, (req, res) => {
       label: row[3],
       icon: row[4],
       path: row[5],
-      type: row[6],
-      visible: row[7],
-      sort_order: row[8]
+      sort_order: row[6],
+      type: row[7] || 'menu',
+      visible: row[8]
     })) : [];
 
     // 构建树形结构
@@ -160,7 +160,7 @@ router.put('/:id', authMiddleware, requireMenu('menus'), (req, res) => {
     }
 
     db.run(`UPDATE menus SET parent_id = ?, key = ?, label = ?, icon = ?, path = ?, type = ?, visible = ?, sort_order = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [parent_id || null, key, label, icon, path, type || 'menu', visible !== undefined ? visible : 1, sort_order, status, req.params.id]);
+      [parent_id || null, key, label, icon || null, path || null, type || 'menu', visible !== undefined ? visible : 1, sort_order || 0, status !== undefined ? status : 1, req.params.id]);
 
     saveDb();
     res.json({ code: 200, message: '菜单更新成功' });
