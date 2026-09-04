@@ -5,10 +5,6 @@ const REFRESH_COOKIE = 'lg_refresh';
 const SESSION_COOKIE = 'lg_session';
 const CSRF_COOKIE = 'lg_csrf';
 
-function isProd() {
-  return process.env.NODE_ENV === 'production';
-}
-
 function parseCookieHeader(header) {
   const cookies = {};
   if (!header) return cookies;
@@ -31,15 +27,26 @@ function cookieMiddleware(req, res, next) {
   next();
 }
 
-function baseCookieOptions() {
+function isSecureRequest(req) {
+  const flag = String(process.env.COOKIE_SECURE || '').toLowerCase();
+  if (flag === '1' || flag === 'true') return true;
+  if (flag === '0' || flag === 'false') return false;
+  if (req?.secure) return true;
+  const proto = req?.headers?.['x-forwarded-proto'];
+  if (proto) return String(proto).split(',')[0].trim() === 'https';
+  return false;
+}
+
+function baseCookieOptions(res) {
+  const secure = isSecureRequest(res?.req);
   return {
-    secure: isProd(),
-    sameSite: isProd() ? 'strict' : 'lax',
+    secure,
+    sameSite: secure ? 'strict' : 'lax',
   };
 }
 
 function setAuthCookies(res, { accessToken, refreshToken, sessionId, accessMaxAgeMs, refreshMaxAgeMs }) {
-  const base = baseCookieOptions();
+  const base = baseCookieOptions(res);
   res.cookie(ACCESS_COOKIE, accessToken, {
     ...base,
     httpOnly: true,
@@ -62,7 +69,7 @@ function setAuthCookies(res, { accessToken, refreshToken, sessionId, accessMaxAg
 }
 
 function clearAuthCookies(res) {
-  const base = baseCookieOptions();
+  const base = baseCookieOptions(res);
   res.clearCookie(ACCESS_COOKIE, { ...base, path: '/' });
   res.clearCookie(REFRESH_COOKIE, { ...base, path: '/api/auth' });
   res.clearCookie(SESSION_COOKIE, { ...base, path: '/' });
@@ -73,7 +80,7 @@ function clearAuthCookies(res) {
 function issueCsrfCookie(res, maxAgeMs) {
   const token = crypto.randomBytes(32).toString('hex');
   res.cookie(CSRF_COOKIE, token, {
-    ...baseCookieOptions(),
+    ...baseCookieOptions(res),
     httpOnly: false,
     path: '/',
     maxAge: maxAgeMs,
@@ -104,4 +111,5 @@ module.exports = {
   issueCsrfCookie,
   getAccessTokenFromRequest,
   parseCookieHeader,
+  isSecureRequest,
 };

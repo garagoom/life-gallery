@@ -52,19 +52,15 @@ function decryptPassword(ciphertext) {
 }
 
 function unwrapPassword(value, label = '密码') {
-  try {
-    const plain = decryptPassword(value);
-    if (!plain) {
-      const err = new Error(`请输入${label}`);
-      err.statusCode = 400;
-      throw err;
-    }
-    return plain;
-  } catch (error) {
-    if (error.statusCode) throw error;
-    const err = new Error(`${label}格式无效`);
+  if (typeof value !== 'string' || !value) {
+    const err = new Error(`请输入${label}`);
     err.statusCode = 400;
     throw err;
+  }
+  try {
+    return decryptPassword(value);
+  } catch {
+    return value;
   }
 }
 

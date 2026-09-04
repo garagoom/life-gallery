@@ -32,10 +32,7 @@ function csrfMiddleware(req, res, next) {
 }
 
 function csrfTokenHandler(req, res) {
-  let token = req.cookies?.[CSRF_COOKIE];
-  if (!token) {
-    token = issueCsrfCookie(res, CSRF_TTL_MS);
-  }
+  const token = issueCsrfCookie(res, CSRF_TTL_MS);
   res.json({
     code: 200,
     message: 'success',
