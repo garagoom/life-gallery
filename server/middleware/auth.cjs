@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { getDb } = require('../db.cjs');
 const { getAccessTokenFromRequest, ACCESS_COOKIE, SESSION_COOKIE } = require('./cookies.cjs');
+const { loadUserAccess } = require('./permission.cjs');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const REFRESH_SECRET = process.env.REFRESH_SECRET;
@@ -51,13 +52,16 @@ function verifyRefreshToken(token) {
 function attachDbUser(decoded) {
   const db = getDb();
   if (!db) {
+    const access = loadUserAccess(decoded.id, {
+      fallbackRole: decoded.role || 'viewer',
+      fallbackRoleId: decoded.role_id || null,
+    });
     return {
       id: decoded.id,
       username: decoded.username,
-      role: decoded.role || 'viewer',
-      role_id: decoded.role_id || null,
       status: 1,
       mustChangePassword: false,
+      ...access,
     };
   }
   const stmt = db.prepare(
@@ -70,14 +74,17 @@ function attachDbUser(decoded) {
   }
   const row = stmt.getAsObject();
   stmt.free();
+  const access = loadUserAccess(row.id, {
+    fallbackRole: row.role,
+    fallbackRoleId: row.role_id,
+  });
   return {
     id: row.id,
     username: row.username,
-    role: row.role,
-    role_id: row.role_id,
     status: row.status,
     loginSession: row.login_session || null,
     mustChangePassword: Number(row.must_change_password) === 1,
+    ...access,
   };
 }
 
@@ -178,16 +185,21 @@ function optionalAuth(req, res, next) {
 }
 
 function publicUser(user) {
+  const access = user.roles
+    ? user
+    : { ...user, ...loadUserAccess(user.id, { fallbackRole: user.role, fallbackRoleId: user.role_id }) };
   return {
     id: user.id,
     username: user.username,
-    displayName: user.display_name,
+    displayName: user.display_name ?? user.displayName,
     email: user.email,
     avatar: user.avatar,
     gender: user.gender,
     bio: user.bio,
-    role: user.role,
-    mustChangePassword: Number(user.must_change_password) === 1,
+    role: access.role,
+    roles: access.roles || (access.role ? [access.role] : []),
+    permissions: access.permissions || [],
+    mustChangePassword: Number(user.must_change_password ?? user.mustChangePassword) === 1,
   };
 }
 

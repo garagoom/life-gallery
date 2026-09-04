@@ -1,35 +1,122 @@
 const { getDb } = require('../db.cjs');
+const { loadRoleRows } = require('../lib/userRoles.cjs');
 
 const ROLE_HIERARCHY = {
   admin: 4,
+  photography_admin: 3,
+  system_admin: 3,
   module_admin: 3,
+  reviewer: 2,
   creator: 2,
-  viewer: 1
+  viewer: 1,
 };
+
+const DATA_PERM_CODES = [
+  'photos.read.own',
+  'photos.read.all',
+  'photos.write.own',
+  'photos.write.all',
+  'photos.review',
+  'users.manage',
+  'roles.manage',
+  'menus.manage',
+];
+
+function isAdminUser(user) {
+  if (!user) return false;
+  if (Array.isArray(user.roles) && user.roles.includes('admin')) return true;
+  return user.role === 'admin';
+}
+
+function hasRoleName(user, name) {
+  if (!user || !name) return false;
+  if (Array.isArray(user.roles) && user.roles.length > 0) {
+    return user.roles.includes(name);
+  }
+  return user.role === name;
+}
+
+function loadUserAccess(userId, { fallbackRole = 'viewer', fallbackRoleId = null } = {}) {
+  const db = getDb();
+  if (!db || userId == null) {
+    const roles = fallbackRole ? [fallbackRole] : [];
+    return {
+      roles,
+      roleIds: fallbackRoleId ? [fallbackRoleId] : [],
+      permissions: [],
+      role: fallbackRole,
+      role_id: fallbackRoleId,
+    };
+  }
+
+  let roleRows = loadRoleRows(db, userId);
+  if (roleRows.length === 0 && fallbackRoleId) {
+    const stmt = db.prepare('SELECT id, name, level FROM roles WHERE id = ? AND status = 1');
+    stmt.bind([fallbackRoleId]);
+    if (stmt.step()) roleRows = [stmt.getAsObject()];
+    stmt.free();
+  }
+  if (roleRows.length === 0 && fallbackRole) {
+    const stmt = db.prepare('SELECT id, name, level FROM roles WHERE name = ? AND status = 1');
+    stmt.bind([fallbackRole]);
+    if (stmt.step()) roleRows = [stmt.getAsObject()];
+    stmt.free();
+  }
+
+  const roleIds = roleRows.map((row) => row.id);
+  const roles = roleRows.map((row) => row.name);
+  const permissions = new Set();
+
+  if (roleIds.length > 0) {
+    const placeholders = roleIds.map(() => '?').join(',');
+    const permStmt = db.prepare(
+      `SELECT code FROM role_data_permissions WHERE role_id IN (${placeholders})`
+    );
+    permStmt.bind(roleIds);
+    while (permStmt.step()) {
+      const { code } = permStmt.getAsObject();
+      if (code) permissions.add(code);
+    }
+    permStmt.free();
+  }
+
+  const primary = roleRows[0] || { name: fallbackRole || 'viewer', id: fallbackRoleId };
+  return {
+    roles,
+    roleIds,
+    permissions: [...permissions],
+    role: primary.name,
+    role_id: primary.id,
+  };
+}
+
+function hasDataPerm(user, code) {
+  if (!user || !code) return false;
+  if (isAdminUser(user)) return true;
+  return Array.isArray(user.permissions) && user.permissions.includes(code);
+}
 
 function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ code: 401, message: '请先登录', data: null });
     }
-
-    const userRoleLevel = ROLE_HIERARCHY[req.user.role] || 0;
-    const requiredLevel = Math.max(...roles.map(r => ROLE_HIERARCHY[r] || 0));
-
-    if (userRoleLevel < requiredLevel) {
-      return res.status(403).json({ code: 403, message: '权限不足', data: null });
-    }
-
-    next();
+    if (isAdminUser(req.user)) return next();
+    if (roles.some((role) => hasRoleName(req.user, role))) return next();
+    return res.status(403).json({ code: 403, message: '权限不足', data: null });
   };
 }
 
 function requireAdmin(req, res, next) {
-  return requireRole('admin')(req, res, next);
+  if (!req.user) {
+    return res.status(401).json({ code: 401, message: '请先登录', data: null });
+  }
+  if (isAdminUser(req.user)) return next();
+  return res.status(403).json({ code: 403, message: '权限不足', data: null });
 }
 
 function requireModuleAdmin(req, res, next) {
-  return requireRole('module_admin')(req, res, next);
+  return requireRole('photography_admin', 'system_admin', 'module_admin')(req, res, next);
 }
 
 function requireCreator(req, res, next) {
@@ -38,9 +125,11 @@ function requireCreator(req, res, next) {
 
 function hasMenu(user, menuKey) {
   if (!user) return false;
-  if (user.role === 'admin') return true;
+  if (isAdminUser(user)) return true;
 
   const db = getDb();
+  if (!db) return false;
+
   const menuStmt = db.prepare('SELECT id FROM menus WHERE key = ? AND status = 1');
   menuStmt.bind([menuKey]);
   if (!menuStmt.step()) {
@@ -50,10 +139,16 @@ function hasMenu(user, menuKey) {
   const menu = menuStmt.getAsObject();
   menuStmt.free();
 
+  const roleIds = Array.isArray(user.roleIds) && user.roleIds.length > 0
+    ? user.roleIds
+    : (user.role_id ? [user.role_id] : []);
+  if (roleIds.length === 0) return false;
+
+  const placeholders = roleIds.map(() => '?').join(',');
   const permStmt = db.prepare(
-    'SELECT COUNT(*) as count FROM role_permissions WHERE role_id = ? AND menu_id = ?'
+    `SELECT COUNT(*) as count FROM role_permissions WHERE menu_id = ? AND role_id IN (${placeholders})`
   );
-  permStmt.bind([user.role_id, menu.id]);
+  permStmt.bind([menu.id, ...roleIds]);
   permStmt.step();
   const perm = permStmt.getAsObject();
   permStmt.free();
@@ -76,12 +171,60 @@ function requireMenu(menuKey) {
   };
 }
 
+function requireDataPerm(code) {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ code: 401, message: '请先登录', data: null });
+    }
+    if (hasDataPerm(req.user, code)) return next();
+    return res.status(403).json({ code: 403, message: '权限不足', data: null });
+  };
+}
+
+function buildPhotoListFilter(user, { scope } = {}) {
+  if (scope === 'all') {
+    return { sql: 'p.review_status = 1', params: [] };
+  }
+  if (hasDataPerm(user, 'photos.read.all')) {
+    return { sql: '1=1', params: [] };
+  }
+  if (hasDataPerm(user, 'photos.read.own') || hasDataPerm(user, 'photos.write.own')) {
+    return { sql: 'p.uploaded_by = ?', params: [user.username] };
+  }
+  return { sql: 'p.review_status = 1', params: [] };
+}
+
+function canWritePhoto(user, photo) {
+  if (!user || !photo) return false;
+  if (hasDataPerm(user, 'photos.write.all')) return true;
+  return hasDataPerm(user, 'photos.write.own') && photo.uploaded_by === user.username;
+}
+
+function visibilitySql(user) {
+  if (hasDataPerm(user, 'photos.read.all') || hasDataPerm(user, 'photos.review')) {
+    return { sql: '1=1', params: [] };
+  }
+  if (user) {
+    return { sql: '(review_status = 1 OR uploaded_by = ?)', params: [user.username] };
+  }
+  return { sql: 'review_status = 1', params: [] };
+}
+
 module.exports = {
   requireRole,
   requireAdmin,
   requireModuleAdmin,
   requireCreator,
   requireMenu,
+  requireDataPerm,
   hasMenu,
+  hasDataPerm,
+  hasRoleName,
+  isAdminUser,
+  loadUserAccess,
+  buildPhotoListFilter,
+  canWritePhoto,
+  visibilitySql,
   ROLE_HIERARCHY,
+  DATA_PERM_CODES,
 };

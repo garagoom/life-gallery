@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getDb, saveDb } = require('../db.cjs');
 const { authMiddleware } = require('../middleware/auth.cjs');
-const { requireMenu } = require('../middleware/permission.cjs');
+const { requireMenu, isAdminUser } = require('../middleware/permission.cjs');
 
 // 获取所有菜单（树形结构）
 router.get('/', authMiddleware, requireMenu('menus'), (req, res) => {
@@ -74,14 +74,21 @@ router.get('/flat', authMiddleware, requireMenu('menus'), (req, res) => {
 router.get('/my', authMiddleware, (req, res) => {
   try {
     const db = getDb();
-    const menus = db.exec(`
-      SELECT DISTINCT m.id, m.parent_id, m.key, m.label, m.icon, m.path, m.sort_order, m.type, m.visible
-      FROM menus m
-      JOIN role_permissions rp ON m.id = rp.menu_id
-      JOIN users u ON rp.role_id = u.role_id
-      WHERE u.id = ? AND m.status = 1 AND m.visible = 1
-      ORDER BY m.sort_order ASC
-    `, [req.user.id])[0];
+    const menus = isAdminUser(req.user)
+      ? db.exec(`
+          SELECT DISTINCT m.id, m.parent_id, m.key, m.label, m.icon, m.path, m.sort_order, m.type, m.visible
+          FROM menus m
+          WHERE m.status = 1 AND m.visible = 1
+          ORDER BY m.sort_order ASC
+        `)[0]
+      : db.exec(`
+          SELECT DISTINCT m.id, m.parent_id, m.key, m.label, m.icon, m.path, m.sort_order, m.type, m.visible
+          FROM menus m
+          JOIN role_permissions rp ON m.id = rp.menu_id
+          JOIN user_roles ur ON ur.role_id = rp.role_id
+          WHERE ur.user_id = ? AND m.status = 1 AND m.visible = 1
+          ORDER BY m.sort_order ASC
+        `, [req.user.id])[0];
     
     const list = menus ? menus.values.map(row => ({
       id: row[0],

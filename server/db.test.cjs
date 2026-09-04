@@ -61,6 +61,74 @@ describe('Database', () => {
     stmt.free();
   });
 
+  it('should seed dual-axis permission tables', () => {
+    const db = getDb();
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('user_roles', 'role_data_permissions')");
+    const names = [];
+    while (tables.step()) names.push(tables.getAsObject().name);
+    tables.free();
+    expect(names).toEqual(expect.arrayContaining(['user_roles', 'role_data_permissions']));
+
+    const photoAdmin = db.prepare("SELECT id FROM roles WHERE name = 'photography_admin'");
+    expect(photoAdmin.step()).toBe(true);
+    photoAdmin.free();
+  });
+
+  it('should union roles and let photography admin read all photos', () => {
+    const bcrypt = require('bcryptjs');
+    const { setUserRoles } = require('./lib/userRoles.cjs');
+    const { loadUserAccess, hasDataPerm, canWritePhoto, buildPhotoListFilter } = require('./middleware/permission.cjs');
+    const db = getDb();
+    const hash = bcrypt.hashSync('testpass123', 10);
+
+    db.run(
+      `INSERT INTO users (username, password, display_name, role) VALUES (?, ?, ?, ?)`,
+      ['perm_mix', hash, 'Perm Mix', 'viewer']
+    );
+    const idStmt = db.prepare("SELECT id FROM users WHERE username = 'perm_mix'");
+    idStmt.step();
+    const userId = idStmt.getAsObject().id;
+    idStmt.free();
+
+    setUserRoles(db, userId, ['photography_admin', 'system_admin']);
+    const access = loadUserAccess(userId);
+    expect(access.roles).toEqual(expect.arrayContaining(['photography_admin', 'system_admin']));
+    expect(hasDataPerm(access, 'photos.read.all')).toBe(true);
+    expect(hasDataPerm(access, 'users.manage')).toBe(true);
+    expect(buildPhotoListFilter({ ...access, username: 'perm_mix' }).sql).toBe('1=1');
+    expect(canWritePhoto({ ...access, username: 'perm_mix' }, { uploaded_by: 'someone-else' })).toBe(true);
+
+    db.run("DELETE FROM user_roles WHERE user_id = ?", [userId]);
+    db.run("DELETE FROM users WHERE id = ?", [userId]);
+    saveDb();
+  });
+
+  it('should not let reviewer write others photos', () => {
+    const bcrypt = require('bcryptjs');
+    const { setUserRoles } = require('./lib/userRoles.cjs');
+    const { loadUserAccess, canWritePhoto, hasDataPerm } = require('./middleware/permission.cjs');
+    const db = getDb();
+    const hash = bcrypt.hashSync('testpass123', 10);
+
+    db.run(
+      `INSERT INTO users (username, password, display_name, role) VALUES (?, ?, ?, ?)`,
+      ['perm_reviewer', hash, 'Reviewer', 'viewer']
+    );
+    const idStmt = db.prepare("SELECT id FROM users WHERE username = 'perm_reviewer'");
+    idStmt.step();
+    const userId = idStmt.getAsObject().id;
+    idStmt.free();
+
+    setUserRoles(db, userId, ['reviewer']);
+    const access = loadUserAccess(userId);
+    expect(hasDataPerm(access, 'photos.review')).toBe(true);
+    expect(canWritePhoto({ ...access, username: 'perm_reviewer' }, { uploaded_by: 'niko' })).toBe(false);
+
+    db.run("DELETE FROM user_roles WHERE user_id = ?", [userId]);
+    db.run("DELETE FROM users WHERE id = ?", [userId]);
+    saveDb();
+  });
+
   it('should insert and retrieve a photo', () => {
     const db = getDb();
     db.run(

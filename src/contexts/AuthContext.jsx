@@ -83,12 +83,20 @@ export function AuthProvider({ children }) {
 
   const hasRole = useCallback((role) => {
     if (!user) return false;
-    const roleHierarchy = { admin: 4, module_admin: 3, creator: 2, viewer: 1 };
-    return (roleHierarchy[user.role] || 0) >= (roleHierarchy[role] || 0);
+    if (Array.isArray(user.roles) && user.roles.length > 0) {
+      return user.roles.includes(role);
+    }
+    return user.role === role;
   }, [user]);
 
+  const can = useCallback((code) => {
+    if (!user) return false;
+    if (hasRole('admin')) return true;
+    return Array.isArray(user.permissions) && user.permissions.includes(code);
+  }, [user, hasRole]);
+
   return (
-    <AuthContext.Provider value={{ user, loading, loginUser, logoutUser, hasRole }}>
+    <AuthContext.Provider value={{ user, loading, loginUser, logoutUser, hasRole, can }}>
       {children}
     </AuthContext.Provider>
   );

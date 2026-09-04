@@ -7,7 +7,7 @@ import styles from './Navbar.module.css';
 
 export default function Navbar() {
   const navigate = useNavigate();
-  const { user, loginUser, hasRole } = useAuth();
+  const { user, loginUser, can } = useAuth();
 
   const userMenuItems = [
     {
@@ -15,7 +15,7 @@ export default function Navbar() {
       label: '个人信息',
       icon: <UserOutlined />,
     },
-    hasRole('admin') && {
+    can('users.manage') && {
       key: 'users',
       label: '用户管理',
       icon: <SettingOutlined />,

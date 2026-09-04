@@ -2,9 +2,10 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { getDb, saveDb } = require('../db.cjs');
 const { authMiddleware } = require('../middleware/auth.cjs');
-const { requireMenu } = require('../middleware/permission.cjs');
+const { requireMenu, isAdminUser } = require('../middleware/permission.cjs');
 const { revokeUserSessions } = require('../lib/session.cjs');
 const { unwrapPassword } = require('../lib/passwordCrypto.cjs');
+const { roleIdByName, setUserRoles } = require('../lib/userRoles.cjs');
 
 const router = express.Router();
 
@@ -15,35 +16,81 @@ const DEFAULT_AVATARS = {
   female: '/images/avatars/female.svg',
 };
 
-const ASSIGNABLE_ROLES = ['admin', 'module_admin', 'creator', 'viewer'];
-const NON_ADMIN_ROLES = ['module_admin', 'creator', 'viewer'];
+const ASSIGNABLE_ROLES = [
+  'admin',
+  'photography_admin',
+  'system_admin',
+  'reviewer',
+  'creator',
+  'viewer',
+  'module_admin',
+];
+const NON_ADMIN_ROLES = [
+  'photography_admin',
+  'system_admin',
+  'reviewer',
+  'creator',
+  'viewer',
+  'module_admin',
+];
 
-function roleIdByName(db, name) {
-  const stmt = db.prepare('SELECT id FROM roles WHERE name = ?');
-  stmt.bind([name]);
-  const id = stmt.step() ? stmt.getAsObject().id : null;
-  stmt.free();
-  return id;
+function normalizeRoles(body, fallbackRole) {
+  const fromArray = Array.isArray(body.roles) ? body.roles.filter(Boolean) : [];
+  if (fromArray.length > 0) return [...new Set(fromArray)];
+  if (body.role) return [body.role];
+  if (fallbackRole) return [fallbackRole];
+  return [];
 }
 
-function assertAssignableRole(actor, role, existingRole) {
-  if (!ASSIGNABLE_ROLES.includes(role)) {
-    const err = new Error('无效的角色');
+function assertAssignableRoles(actor, roleNames, existingRoles = []) {
+  if (!roleNames.length) {
+    const err = new Error('请至少选择一个角色');
     err.statusCode = 400;
     throw err;
   }
-  if (actor.role !== 'admin') {
-    if (role === 'admin' || existingRole === 'admin') {
-      const err = new Error('只有超级管理员可以管理超管角色');
-      err.statusCode = 403;
-      throw err;
-    }
-    if (!NON_ADMIN_ROLES.includes(role)) {
+  for (const role of roleNames) {
+    if (!ASSIGNABLE_ROLES.includes(role)) {
       const err = new Error('无效的角色');
       err.statusCode = 400;
       throw err;
     }
   }
+  const existingHasAdmin = existingRoles.includes('admin');
+  const nextHasAdmin = roleNames.includes('admin');
+  if (!isAdminUser(actor)) {
+    if (nextHasAdmin || existingHasAdmin) {
+      const err = new Error('只有超级管理员可以管理超管角色');
+      err.statusCode = 403;
+      throw err;
+    }
+    if (roleNames.some((role) => !NON_ADMIN_ROLES.includes(role))) {
+      const err = new Error('无效的角色');
+      err.statusCode = 400;
+      throw err;
+    }
+  }
+}
+
+function loadUserRoleMap(db, userIds) {
+  const map = new Map(userIds.map((id) => [id, []]));
+  if (userIds.length === 0) return map;
+  const placeholders = userIds.map(() => '?').join(',');
+  const stmt = db.prepare(`
+    SELECT ur.user_id, r.name
+    FROM user_roles ur
+    JOIN roles r ON r.id = ur.role_id
+    WHERE ur.user_id IN (${placeholders})
+    ORDER BY r.level DESC, r.id ASC
+  `);
+  stmt.bind(userIds);
+  while (stmt.step()) {
+    const row = stmt.getAsObject();
+    const list = map.get(row.user_id) || [];
+    list.push(row.name);
+    map.set(row.user_id, list);
+  }
+  stmt.free();
+  return map;
 }
 
 router.get('/', (req, res) => {
@@ -65,10 +112,16 @@ router.get('/', (req, res) => {
     }
     stmt.free();
 
+    const roleMap = loadUserRoleMap(db, users.map((u) => u.id));
+    const data = users.map((user) => ({
+      ...user,
+      roles: roleMap.get(user.id)?.length ? roleMap.get(user.id) : (user.role ? [user.role] : []),
+    }));
+
     res.json({
       code: 200,
       message: 'success',
-      data: users,
+      data,
       pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
     });
   } catch (error) {
@@ -79,7 +132,8 @@ router.get('/', (req, res) => {
 
 router.post('/', (req, res) => {
   try {
-    const { username, displayName, email, role, gender, bio } = req.body;
+    const { username, displayName, email, gender, bio } = req.body;
+    const roles = normalizeRoles(req.body);
     let password;
     try {
       password = unwrapPassword(req.body.password);
@@ -103,7 +157,7 @@ router.post('/', (req, res) => {
       return res.status(400).json({ code: 400, message: '密码长度需在8-20个字符之间', data: null });
     }
 
-    assertAssignableRole(req.user, role);
+    assertAssignableRoles(req.user, roles);
 
     const db = getDb();
 
@@ -119,11 +173,16 @@ router.post('/', (req, res) => {
 
     const hashedPassword = bcrypt.hashSync(password, 10);
     const avatar = DEFAULT_AVATARS[gender] || DEFAULT_AVATARS.male;
-    const roleId = roleIdByName(db, role);
+    const primary = roleIdByName(db, roles[0]);
     db.run(
       'INSERT INTO users (username, password, display_name, email, role, role_id, gender, bio, avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [username, hashedPassword, displayName || username, email || null, role, roleId, gender || null, bio || null, avatar]
+      [username, hashedPassword, displayName || username, email || null, primary?.name || roles[0], primary?.id || null, gender || null, bio || null, avatar]
     );
+    const idStmt = db.prepare('SELECT last_insert_rowid() as id');
+    idStmt.step();
+    const userId = idStmt.getAsObject().id;
+    idStmt.free();
+    setUserRoles(db, userId, roles);
     saveDb();
 
     res.status(201).json({ code: 201, message: '创建成功', data: null });
@@ -138,7 +197,7 @@ router.post('/', (req, res) => {
 
 router.put('/:id', (req, res) => {
   try {
-    const { displayName, email, role, gender, bio } = req.body;
+    const { displayName, email, gender, bio } = req.body;
     const userId = parseInt(req.params.id);
 
     const db = getDb();
@@ -152,23 +211,37 @@ router.put('/:id', (req, res) => {
     const existing = checkStmt.getAsObject();
     checkStmt.free();
 
-    const nextRole = role || existing.role;
-    assertAssignableRole(req.user, nextRole, existing.role);
+    const existingRolesStmt = db.prepare(`
+      SELECT r.name FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = ?
+    `);
+    existingRolesStmt.bind([userId]);
+    const existingRoles = [];
+    while (existingRolesStmt.step()) {
+      existingRoles.push(existingRolesStmt.getAsObject().name);
+    }
+    existingRolesStmt.free();
+    if (existingRoles.length === 0 && existing.role) existingRoles.push(existing.role);
 
-    if (userId === req.user.id && nextRole !== existing.role) {
+    const nextRoles = normalizeRoles(req.body, existing.role);
+    assertAssignableRoles(req.user, nextRoles, existingRoles);
+
+    const sameRoles = nextRoles.length === existingRoles.length
+      && nextRoles.every((role) => existingRoles.includes(role));
+
+    if (userId === req.user.id && !sameRoles) {
       return res.status(400).json({ code: 400, message: '不能修改自己的角色', data: null });
     }
 
-    const roleChanged = nextRole !== existing.role;
-    const roleId = roleChanged ? roleIdByName(db, nextRole) : existing.role_id;
-
     db.run(
-      'UPDATE users SET display_name = ?, email = ?, role = ?, role_id = ?, gender = ?, bio = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [displayName || existing.display_name, email || existing.email, nextRole, roleId, gender || existing.gender, bio !== undefined ? bio : existing.bio, userId]
+      'UPDATE users SET display_name = ?, email = ?, gender = ?, bio = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [displayName || existing.display_name, email || existing.email, gender || existing.gender, bio !== undefined ? bio : existing.bio, userId]
     );
+    if (!sameRoles) {
+      setUserRoles(db, userId, nextRoles);
+    }
     saveDb();
 
-    if (roleChanged) {
+    if (!sameRoles) {
       revokeUserSessions(userId);
     }
 
@@ -217,6 +290,7 @@ router.delete('/:id', (req, res) => {
 
     revokeUserSessions(userId);
     const db = getDb();
+    db.run('DELETE FROM user_roles WHERE user_id = ?', [userId]);
     db.run('DELETE FROM users WHERE id = ?', [userId]);
     saveDb();
 

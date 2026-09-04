@@ -49,7 +49,7 @@ export default function UserManage() {
       username: record.username,
       displayName: record.display_name,
       email: record.email,
-      role: record.role,
+      roles: record.roles?.length ? record.roles : (record.role ? [record.role] : []),
       gender: record.gender,
       bio: record.bio,
     });
@@ -90,7 +90,7 @@ export default function UserManage() {
       const trimmed = {
         displayName: values.displayName?.trim(),
         email: values.email?.trim(),
-        role: values.role,
+        roles: values.roles,
         gender: values.gender,
         bio: values.bio?.trim(),
       };
@@ -164,13 +164,19 @@ export default function UserManage() {
     },
     {
       title: '角色',
-      dataIndex: 'role',
-      key: 'role',
-      width: 112,
-      align: 'center',
-      render: (role) => (
-        <Tag color={getColor('role', role)}>{getLabel('role', role)}</Tag>
-      ),
+      dataIndex: 'roles',
+      key: 'roles',
+      width: 220,
+      render: (roles, record) => {
+        const list = roles?.length ? roles : (record.role ? [record.role] : []);
+        return (
+          <Space size={[4, 4]} wrap>
+            {list.map((role) => (
+              <Tag key={role} color={getColor('role', role)}>{getLabel('role', role)}</Tag>
+            ))}
+          </Space>
+        );
+      },
     },
     {
       title: '状态',
@@ -258,7 +264,7 @@ export default function UserManage() {
         <Form
           form={form}
           layout="vertical"
-          initialValues={{ role: 'viewer' }}
+          initialValues={{ roles: ['viewer'] }}
           style={{ marginTop: 24 }}
         >
           {!editingUser && (
@@ -310,10 +316,10 @@ export default function UserManage() {
             <Input.TextArea placeholder="输入个人介绍" rows={2} maxLength={200} showCount />
           </Form.Item>
           
-          <Form.Item name="role" label="角色" rules={[{ required: true }]}>
-            <Select>
+          <Form.Item name="roles" label="角色" rules={[{ required: true, message: '请选择角色' }]}>
+            <Select mode="multiple" placeholder="可多选角色">
               {roles
-                .filter((r) => currentUser?.role === 'admin' || r.value !== 'admin')
+                .filter((r) => currentUser?.roles?.includes('admin') || currentUser?.role === 'admin' || r.value !== 'admin')
                 .map((r) => (
                 <Select.Option key={r.value} value={r.value}>{r.label}</Select.Option>
               ))}

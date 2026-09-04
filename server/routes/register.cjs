@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const { getDb, saveDb } = require('../db.cjs');
 const { registerLimiter } = require('../middleware/rateLimit.cjs');
 const { unwrapPassword } = require('../lib/passwordCrypto.cjs');
+const { setUserRoles } = require('../lib/userRoles.cjs');
 
 const DEFAULT_AVATARS = {
   male: '/images/avatars/male.svg',
@@ -60,6 +61,9 @@ router.post('/register', registerLimiter, (req, res) => {
       `INSERT INTO users (username, password, display_name, email, gender, bio, avatar, role, role_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [username, hashedPassword, displayName || username, email || null, gender || null, bio || null, avatar, userRole, roleId]
     );
+    const idRow = db.exec('SELECT last_insert_rowid()')[0];
+    const userId = idRow.values[0][0];
+    setUserRoles(db, userId, [userRole]);
     saveDb();
 
     res.json({ code: 200, message: '注册成功' });

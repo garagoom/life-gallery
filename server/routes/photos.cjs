@@ -6,7 +6,7 @@ const sharp = require('sharp');
 const exifReader = require('exif-reader');
 const { getDb, saveDb } = require('../db.cjs');
 const { authMiddleware, optionalAuth } = require('../middleware/auth.cjs');
-const { requireMenu, hasMenu } = require('../middleware/permission.cjs');
+const { requireMenu, requireDataPerm, buildPhotoListFilter, canWritePhoto, visibilitySql } = require('../middleware/permission.cjs');
 const { canViewPhoto } = require('../middleware/media.cjs');
 const { analyzeRgba } = require('../lib/imageAnalysis.cjs');
 const { avifCompanion, encodeAvif } = require('../lib/photoDerivatives.cjs');
@@ -473,21 +473,10 @@ router.get('/', authMiddleware, (req, res) => {
   try {
     const db = getDb();
     const { category, title, dateFrom, dateTo, page = 1, pageSize = 20, scope } = req.query;
-    
-    let whereConditions = [];
-    let params = [];
-    
-    // scope=all: show all approved photos (for portfolio)
-    // default: non-admin users only see their own photos (for admin page)
-    if (scope !== 'all' && req.user && req.user.role !== 'admin') {
-      whereConditions.push('p.uploaded_by = ?');
-      params.push(req.user.username);
-    }
-    
-    // Non-admin always see only approved photos
-    if (req.user && req.user.role !== 'admin') {
-      whereConditions.push('p.review_status = 1');
-    }
+
+    const listFilter = buildPhotoListFilter(req.user, { scope });
+    let whereConditions = listFilter.sql && listFilter.sql !== '1=1' ? [listFilter.sql] : [];
+    let params = [...listFilter.params];
     
     if (category) {
       whereConditions.push('p.category = ?');
@@ -562,8 +551,7 @@ router.post('/batch-delete', authMiddleware, requireMenu('admin'), (req, res) =>
       stmt.bind([parseInt(id)]);
       if (stmt.step()) {
         const photo = stmt.getAsObject();
-        // Permission: non-admin users can only delete their own photos
-        if (req.user.role !== 'admin' && photo.uploaded_by !== req.user.username) {
+        if (!canWritePhoto(req.user, photo)) {
           stmt.free();
           continue;
         }
@@ -583,7 +571,7 @@ router.post('/batch-delete', authMiddleware, requireMenu('admin'), (req, res) =>
 });
 
 // GET /api/photos/review - List all photos for review (module_admin+)
-router.get('/review', authMiddleware, requireMenu('review'), (req, res) => {
+router.get('/review', authMiddleware, requireMenu('review'), requireDataPerm('photos.review'), (req, res) => {
   try {
     const db = getDb();
     const { review_status, page = 1, pageSize = 20 } = req.query;
@@ -629,7 +617,7 @@ router.get('/review', authMiddleware, requireMenu('review'), (req, res) => {
 });
 
 // PUT /api/photos/batch-review - Batch approve/reject
-router.post('/batch-review', authMiddleware, requireMenu('review'), (req, res) => {
+router.post('/batch-review', authMiddleware, requireMenu('review'), requireDataPerm('photos.review'), (req, res) => {
   try {
     const { ids, review_status } = req.body;
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -651,16 +639,6 @@ router.post('/batch-review', authMiddleware, requireMenu('review'), (req, res) =
     error(res, '批量审核失败');
   }
 });
-
-function visibilitySql(user) {
-  if (user?.role === 'admin' || hasMenu(user, 'review')) {
-    return { sql: '1=1', params: [] };
-  }
-  if (user) {
-    return { sql: '(review_status = 1 OR uploaded_by = ?)', params: [user.username] };
-  }
-  return { sql: 'review_status = 1', params: [] };
-}
 
 // GET /api/photos/:id
 router.get('/:id', optionalAuth, (req, res) => {
@@ -800,8 +778,7 @@ router.put('/:id', authMiddleware, requireMenu('admin'), (req, res) => {
     const existing = checkStmt.getAsObject();
     checkStmt.free();
     
-    // Permission: non-admin users can only edit their own photos
-    if (req.user.role !== 'admin' && existing.uploaded_by !== req.user.username) {
+    if (!canWritePhoto(req.user, existing)) {
       return error(res, '无权编辑此照片', 403);
     }
     
@@ -845,8 +822,7 @@ router.delete('/:id', authMiddleware, requireMenu('admin'), (req, res) => {
     const photo = checkStmt.getAsObject();
     checkStmt.free();
     
-    // Permission: non-admin users can only delete their own photos
-    if (req.user.role !== 'admin' && photo.uploaded_by !== req.user.username) {
+    if (!canWritePhoto(req.user, photo)) {
       return error(res, '无权删除此照片', 403);
     }
     

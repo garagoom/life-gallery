@@ -5,6 +5,54 @@ const path = require('path');
 let db = null;
 let saveTimer = null;
 
+function getRoleIdByName(database, name) {
+  const stmt = database.prepare('SELECT id FROM roles WHERE name = ?');
+  stmt.bind([name]);
+  const id = stmt.step() ? stmt.getAsObject().id : null;
+  stmt.free();
+  return id;
+}
+
+function migrateModuleAdminRole(database) {
+  const moduleAdminId = getRoleIdByName(database, 'module_admin');
+  if (!moduleAdminId) return;
+
+  const photoAdminId = getRoleIdByName(database, 'photography_admin');
+  if (!photoAdminId) {
+    database.run(
+      `UPDATE roles SET name = 'photography_admin', label = '摄影模块管理员' WHERE id = ?`,
+      [moduleAdminId]
+    );
+    database.run(`UPDATE users SET role = 'photography_admin' WHERE role = 'module_admin'`);
+    return;
+  }
+
+  if (photoAdminId === moduleAdminId) return;
+
+  database.run(
+    `UPDATE users SET role = 'photography_admin', role_id = ? WHERE role = 'module_admin' OR role_id = ?`,
+    [photoAdminId, moduleAdminId]
+  );
+  database.run(
+    `INSERT OR IGNORE INTO role_permissions (role_id, menu_id)
+     SELECT ?, menu_id FROM role_permissions WHERE role_id = ?`,
+    [photoAdminId, moduleAdminId]
+  );
+  database.run(`DELETE FROM role_permissions WHERE role_id = ?`, [moduleAdminId]);
+  database.run(`DELETE FROM roles WHERE id = ?`, [moduleAdminId]);
+}
+
+function seedRoleDataPerms(database, roleName, codes) {
+  const roleId = getRoleIdByName(database, roleName);
+  if (!roleId) return;
+  for (const code of codes) {
+    database.run(
+      'INSERT OR IGNORE INTO role_data_permissions (role_id, code) VALUES (?, ?)',
+      [roleId, code]
+    );
+  }
+}
+
 function resolveDbPath() {
   if (process.env.DB_PATH) return process.env.DB_PATH;
   return path.join(__dirname, '..', 'database.sqlite');
@@ -204,9 +252,12 @@ async function initDb() {
     )
   `);
 
-  // Insert default roles
+  migrateModuleAdminRole(db);
+
   db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('admin', '超级管理员', 4)`);
-  db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('module_admin', '模块管理员', 3)`);
+  db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('photography_admin', '摄影模块管理员', 3)`);
+  db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('system_admin', '系统模块管理员', 3)`);
+  db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('reviewer', '图片审核员', 2)`);
   db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('creator', '创作者', 2)`);
   db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('viewer', '访客', 1)`);
 
@@ -223,7 +274,9 @@ async function initDb() {
 
   // Assign default permissions
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'admin'`);
-  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'module_admin' AND m.id IN (1, 2, 3, 4, 9)`);
+  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'photography_admin' AND m.id IN (1, 2, 3, 4, 9)`);
+  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'system_admin' AND m.id IN (5, 6, 7, 8)`);
+  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'reviewer' AND m.id IN (1, 9)`);
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'creator' AND m.id IN (1, 2, 3)`);
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'viewer' AND m.id IN (1, 2, 3)`);
 
@@ -246,9 +299,11 @@ async function initDb() {
   // Seed dictionary data
   const dicts = [
     ['role', 'admin', '超级管理员', 'red', 4, 1],
-    ['role', 'module_admin', '模块管理员', 'orange', 3, 2],
-    ['role', 'creator', '创作者', 'blue', 2, 3],
-    ['role', 'viewer', '访客', 'default', 1, 4],
+    ['role', 'photography_admin', '摄影模块管理员', 'orange', 3, 2],
+    ['role', 'system_admin', '系统模块管理员', 'gold', 3, 3],
+    ['role', 'reviewer', '图片审核员', 'purple', 2, 4],
+    ['role', 'creator', '创作者', 'blue', 2, 5],
+    ['role', 'viewer', '访客', 'default', 1, 6],
     ['review_status', '0', '待审核', 'orange', null, 1],
     ['review_status', '1', '已通过', 'green', null, 2],
     ['review_status', '2', '已拒绝', 'red', null, 3],
@@ -294,11 +349,43 @@ async function initDb() {
       [type, value, label, color, level, sort_order]);
   }
 
-  // Migrate existing role string to role_id
-  db.run(`UPDATE users SET role_id = (SELECT id FROM roles WHERE roles.name = users.role) WHERE role_id IS NULL`);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS user_roles (
+      user_id INTEGER NOT NULL,
+      role_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, role_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
+    )
+  `);
 
-  // Ensure admin user has correct role_id
+  db.run(`
+    CREATE TABLE IF NOT EXISTS role_data_permissions (
+      role_id INTEGER NOT NULL,
+      code TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (role_id, code),
+      FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
+    )
+  `);
+
+  seedRoleDataPerms(db, 'photography_admin', ['photos.read.all', 'photos.write.all', 'photos.review']);
+  seedRoleDataPerms(db, 'system_admin', ['users.manage', 'roles.manage', 'menus.manage']);
+  seedRoleDataPerms(db, 'reviewer', ['photos.read.all', 'photos.review']);
+  seedRoleDataPerms(db, 'creator', ['photos.read.own', 'photos.write.own']);
+
+  db.run(`UPDATE dictionaries SET status = 0 WHERE type = 'role' AND value = 'module_admin'`);
+  db.run(`UPDATE users SET role = 'photography_admin' WHERE role = 'module_admin'`);
+
+  db.run(`UPDATE users SET role_id = (SELECT id FROM roles WHERE roles.name = users.role) WHERE role_id IS NULL`);
+  db.run(`UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'photography_admin') WHERE role = 'photography_admin'`);
   db.run(`UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'admin') WHERE username = 'admin'`);
+
+  db.run(`
+    INSERT OR IGNORE INTO user_roles (user_id, role_id)
+    SELECT id, role_id FROM users WHERE role_id IS NOT NULL
+  `);
 
   // Backfill existing users: default avatar by gender, gender='secret' if null
   db.run(`UPDATE users SET gender = 'secret' WHERE gender IS NULL`);

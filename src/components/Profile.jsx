@@ -194,7 +194,9 @@ export default function Profile() {
           </Upload>
           <div style={{ marginLeft: 16 }}>
             <div style={{ fontSize: 18, fontWeight: 500 }}>{user?.displayName || user?.username}</div>
-            <Text type="secondary">{getLabel('role', user?.role)}</Text>
+            <Text type="secondary">
+              {(user?.roles?.length ? user.roles : [user?.role]).filter(Boolean).map((role) => getLabel('role', role)).join('、')}
+            </Text>
             {user?.gender && user.gender !== 'secret' && (
               <Text type="secondary" style={{ marginLeft: 8 }}>· {getLabel('gender', user.gender)}</Text>
             )}

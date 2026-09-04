@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const { getDb } = require('../db.cjs');
-const { hasMenu } = require('./permission.cjs');
+const { hasDataPerm } = require('./permission.cjs');
 const { lookupName } = require('../lib/photoDerivatives.cjs');
 
 const uploadsDir = path.join(__dirname, '..', 'uploads');
@@ -28,9 +28,9 @@ function canViewPhoto(user, photo) {
   if (!photo) return false;
   if (Number(photo.review_status) === 1) return true;
   if (!user) return false;
-  if (user.role === 'admin') return true;
+  if (hasDataPerm(user, 'photos.read.all') || hasDataPerm(user, 'photos.review')) return true;
   if (photo.uploaded_by && photo.uploaded_by === user.username) return true;
-  return hasMenu(user, 'review');
+  return false;
 }
 
 function lookupPhotoByFile(kind, filename) {
