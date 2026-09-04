@@ -3,9 +3,14 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { getPhotoById } from '../api/photos';
 import { getPhotoUrl } from '../data/photos';
 import { getCachedPhoto, cachePhoto } from '../utils/imageCache';
-import { extractHistogram } from '../utils/extractHistogram';
+import {
+  extractImageAnalysis,
+  parseStoredHistogram,
+  parseStoredPalette,
+} from '../utils/extractImageAnalysis';
 import { formatMeteringMode, formatWhiteBalance, formatExposureBias } from '../utils/exifFormat';
 import CreatorCard from './CreatorCard';
+import RgbWaveform from './RgbWaveform';
 import styles from './PhotoDetail.module.css';
 
 export default function PhotoDetail({ overlay = false }) {
@@ -16,6 +21,7 @@ export default function PhotoDetail({ overlay = false }) {
   const [photo, setPhoto] = useState(() => getCachedPhoto(id));
   const [loading, setLoading] = useState(!getCachedPhoto(id));
   const [histogramData, setHistogramData] = useState(null);
+  const [palette, setPalette] = useState([]);
   const [creatorCardOpen, setCreatorCardOpen] = useState(false);
   const imgRef = useRef(null);
 
@@ -33,23 +39,30 @@ export default function PhotoDetail({ overlay = false }) {
     if (cached) {
       setPhoto(cached);
       setLoading(false);
-      return;
+    } else {
+      setLoading(true);
     }
-    setLoading(true);
     getPhotoById(id)
-      .then(data => {
+      .then((data) => {
         if (!cancelled) {
           cachePhoto(id, data);
           setPhoto(data);
         }
       })
-      .catch(() => { if (!cancelled) setPhoto(null); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .catch(() => {
+        if (!cancelled && !cached) setPhoto(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   useEffect(() => {
     setHistogramData(null);
+    setPalette([]);
     overlayRef.current?.scrollTo(0, 0);
   }, [id]);
 
@@ -61,18 +74,41 @@ export default function PhotoDetail({ overlay = false }) {
     return () => document.removeEventListener('keydown', handleKey);
   }, [handleBack]);
 
-  useEffect(() => {
-    if (!photo || histogramData) return;
-    const img = imgRef.current;
-    if (!img || !img.complete || !img.naturalWidth) return;
-    setHistogramData(extractHistogram(img));
-  }, [photo, histogramData]);
+  const applyStoredAnalysis = useCallback((nextPhoto) => {
+    const storedHistogram = parseStoredHistogram(nextPhoto?.histogram);
+    const storedPalette = parseStoredPalette(nextPhoto?.palette);
+    if (storedHistogram) {
+      setHistogramData(storedHistogram);
+      setPalette(storedPalette);
+      return true;
+    }
+    return false;
+  }, []);
 
-  const handleImgLoad = useCallback(() => {
-    if (histogramData) return;
+  const scanFromImage = useCallback((img) => {
+    if (!img || !img.naturalWidth) return;
+    try {
+      const analysis = extractImageAnalysis(img);
+      setHistogramData(analysis.histogram);
+      setPalette(analysis.palette);
+    } catch {
+      setHistogramData(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!photo) return;
+    if (applyStoredAnalysis(photo)) return;
+    if (photo.histogram === undefined && photo.palette === undefined) return;
     const img = imgRef.current;
-    if (img) setHistogramData(extractHistogram(img));
-  }, [histogramData]);
+    if (img?.complete && img.naturalWidth) scanFromImage(img);
+  }, [photo, applyStoredAnalysis, scanFromImage]);
+
+  const handleImgLoad = useCallback((e) => {
+    if (applyStoredAnalysis(photo)) return;
+    if (photo?.histogram === undefined && photo?.palette === undefined) return;
+    scanFromImage(e.currentTarget);
+  }, [photo, applyStoredAnalysis, scanFromImage]);
 
   if (loading) {
     return (
@@ -125,15 +161,12 @@ export default function PhotoDetail({ overlay = false }) {
     { label: '测光模式', value: formatMeteringMode(photo.metering_mode) },
     { label: '闪光灯', value: photo.flash },
     { label: '软件', value: photo.software },
-  ].filter(item => item.value);
+  ].filter((item) => item.value);
 
   return (
     <div ref={overlayRef} className={overlay ? `${styles.page} ${styles.overlay}` : styles.page}>
       <div className={styles.topNav}>
-        <button
-          className={styles.navBtn}
-          onClick={handleBack}
-        >
+        <button className={styles.navBtn} onClick={handleBack}>
           返回
         </button>
       </div>
@@ -145,12 +178,16 @@ export default function PhotoDetail({ overlay = false }) {
             src={getPhotoUrl(photo)}
             alt={photo.title}
             className={styles.photo}
+            crossOrigin="anonymous"
             onLoad={handleImgLoad}
           />
         </div>
 
         {cameraName && (
-          <div className={styles.cameraLine}>{cameraName}{lensName ? `, ${lensName}` : ''}</div>
+          <div className={styles.cameraLine}>
+            {cameraName}
+            {lensName ? `, ${lensName}` : ''}
+          </div>
         )}
 
         <h1 className={styles.title}>{photo.title || 'Untitled'}</h1>
@@ -168,7 +205,9 @@ export default function PhotoDetail({ overlay = false }) {
                 {(photo.uploader_display_name || photo.uploaded_by || '').slice(0, 1)}
               </div>
             )}
-            <span className={styles.creatorName}>{photo.uploader_display_name || photo.uploaded_by}</span>
+            <span className={styles.creatorName}>
+              {photo.uploader_display_name || photo.uploaded_by}
+            </span>
           </div>
         )}
 
@@ -192,7 +231,7 @@ export default function PhotoDetail({ overlay = false }) {
           <div className={styles.exifCard}>
             <h3 className={styles.exifTitle}>图像拍摄信息</h3>
             <div className={styles.exifGrid}>
-              {exifItems.map(item => (
+              {exifItems.map((item) => (
                 <div key={item.label} className={styles.exifItem}>
                   <span className={styles.exifLabel}>{item.label}</span>
                   <span className={styles.exifValue}>{item.value}</span>
@@ -204,58 +243,24 @@ export default function PhotoDetail({ overlay = false }) {
 
         {histogramData && (
           <div className={styles.exifCard}>
-            <h3 className={styles.exifTitle}>色相直方图</h3>
-            <Histogram data={histogramData} />
+            <RgbWaveform data={histogramData} />
+          </div>
+        )}
+
+        {palette.length > 0 && (
+          <div className={styles.exifCard}>
+            <h3 className={styles.exifTitle}>主色</h3>
+            <div className={styles.paletteRow}>
+              {palette.map((c) => (
+                <div key={c.hex} className={styles.paletteItem} title={c.hex}>
+                  <span className={styles.paletteSwatch} style={{ background: c.hex }} />
+                  <span className={styles.paletteHex}>{c.hex}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
     </div>
-  );
-}
-
-function Histogram({ data }) {
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !data) return;
-    const ctx = canvas.getContext('2d');
-    const dpr = window.devicePixelRatio || 1;
-    const displayW = canvas.clientWidth;
-    const displayH = canvas.clientHeight;
-    canvas.width = displayW * dpr;
-    canvas.height = displayH * dpr;
-    ctx.scale(dpr, dpr);
-
-    ctx.clearRect(0, 0, displayW, displayH);
-
-    const maxVal = Math.max(...data.r, ...data.g, ...data.b, 1);
-
-    const channels = [
-      { arr: data.r, color: 'rgba(255, 0, 0, 0.5)' },
-      { arr: data.g, color: 'rgba(0, 180, 0, 0.5)' },
-      { arr: data.b, color: 'rgba(0, 80, 255, 0.5)' },
-    ];
-
-    for (const ch of channels) {
-      ctx.beginPath();
-      ctx.moveTo(0, displayH);
-      for (let i = 0; i < 256; i++) {
-        const x = (i / 255) * displayW;
-        const y = displayH - (ch.arr[i] / maxVal) * displayH * 0.95;
-        ctx.lineTo(x, y);
-      }
-      ctx.lineTo(displayW, displayH);
-      ctx.closePath();
-      ctx.fillStyle = ch.color;
-      ctx.fill();
-    }
-  }, [data]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      style={{ width: '100%', height: 120, borderRadius: 6, background: 'var(--bg-primary)' }}
-    />
   );
 }

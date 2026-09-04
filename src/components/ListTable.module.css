@@ -1,0 +1,8 @@
+.table :global(.ant-table-thead > tr > th),
+.table :global(.ant-table-tbody > tr > td) {
+  white-space: nowrap;
+}
+
+.table :global(.ant-space) {
+  flex-wrap: nowrap;
+}

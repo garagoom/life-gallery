@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Form, Input, Button, message, Card, Avatar, Divider, Tabs, Typography, Radio, Upload } from 'antd';
+import { Form, Input, Button, message, Card, Avatar, Divider, Tabs, Typography, Radio, Upload, Alert } from 'antd';
 import { UserOutlined, LockOutlined, SaveOutlined, CameraOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useDict } from '../contexts/DictContext';
-import { uploadAvatar } from '../api/auth';
+import { changePassword, uploadAvatar, updateProfile } from '../api/auth';
 import AvatarCropper from './AvatarCropper';
 import styles from './Admin.module.css';
 
@@ -32,10 +32,6 @@ export default function Profile() {
   }, [user, profileForm]);
 
   const handleBeforeUpload = (file) => {
-    if (file.size > 5 * 1024 * 1024) {
-      message.error('图片不能超过 5MB');
-      return false;
-    }
     const reader = new FileReader();
     reader.onload = (e) => {
       setCropImage(e.target.result);
@@ -67,24 +63,11 @@ export default function Profile() {
   const handleUpdateProfile = async (values) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch('/api/auth/profile', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(values),
-      });
-      const data = await res.json();
-      if (data.code === 200) {
-        message.success('个人信息更新成功');
-        loginUser({ ...user, ...values });
-      } else {
-        message.error(data.message || '更新失败');
-      }
+      await updateProfile(values);
+      message.success('个人信息更新成功');
+      loginUser({ ...user, ...values });
     } catch (err) {
-      message.error('网络错误');
+      message.error(err.message || '更新失败');
     }
     setLoading(false);
   };
@@ -92,27 +75,16 @@ export default function Profile() {
   const handleChangePassword = async (values) => {
     setPasswordLoading(true);
     try {
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch('/api/auth/password', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          oldPassword: values.oldPassword,
-          newPassword: values.newPassword,
-        }),
-      });
-      const data = await res.json();
-      if (data.code === 200) {
-        message.success('密码修改成功');
-        passwordForm.resetFields();
+      const result = await changePassword(values.oldPassword, values.newPassword);
+      message.success('密码修改成功');
+      passwordForm.resetFields();
+      if (result.data?.user) {
+        loginUser(result.data.user);
       } else {
-        message.error(data.message || '修改失败');
+        loginUser({ ...user, mustChangePassword: false });
       }
     } catch (err) {
-      message.error('网络错误');
+      message.error(err.message || '修改失败');
     }
     setPasswordLoading(false);
   };
@@ -234,8 +206,19 @@ export default function Profile() {
             {user.bio}
           </div>
         )}
+        {user?.mustChangePassword && (
+          <Alert
+            type="warning"
+            showIcon
+            message="当前密码过于简单或为初始密码，请先修改后再使用其他功能"
+            style={{ marginBottom: 16 }}
+          />
+        )}
         <Divider />
-        <Tabs items={tabItems} />
+        <Tabs
+          items={user?.mustChangePassword ? tabItems.filter((item) => item.key === 'password') : tabItems}
+          defaultActiveKey={user?.mustChangePassword ? 'password' : 'info'}
+        />
       </Card>
       </div>
       <AvatarCropper

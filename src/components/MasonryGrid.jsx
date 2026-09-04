@@ -1,5 +1,5 @@
 import Masonry from 'react-masonry-css';
-import { getPhotoUrl } from '../data/photos';
+import { getThumbnailUrl, getMediumUrl, toAvifUrl } from '../data/photos';
 import { getBrandLogo } from '../data/brandLogos';
 import { cachePhoto } from '../utils/imageCache';
 import { useCallback } from 'react';
@@ -27,6 +27,19 @@ export default function MasonryGrid({ photos, onPhotoClick }) {
         const cameraName = photo.camera_model || photo.camera_make || '';
         const brandLogo = getBrandLogo(photo.camera_make);
         const author = photo.uploader_display_name || photo.uploaded_by || '';
+        const thumbUrl = getThumbnailUrl(photo);
+        const mediumUrl = getMediumUrl(photo);
+        const useAvif = Number(photo.has_avif) === 1;
+        const avifThumb = useAvif ? toAvifUrl(thumbUrl) : null;
+        const avifMedium = useAvif ? toAvifUrl(mediumUrl) : null;
+        const ratio = photo.width && photo.height
+          ? { aspectRatio: `${photo.width} / ${photo.height}` }
+          : undefined;
+        const sizes = '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw';
+        const webpSrcSet = mediumUrl ? `${thumbUrl} 300w, ${mediumUrl} 1200w` : undefined;
+        const avifSrcSet = avifThumb
+          ? (avifMedium ? `${avifThumb} 300w, ${avifMedium} 1200w` : `${avifThumb} 300w`)
+          : undefined;
 
         return (
           <div
@@ -34,12 +47,20 @@ export default function MasonryGrid({ photos, onPhotoClick }) {
             className={styles.photoItem}
             onClick={() => handleClick(photo)}
           >
-            <img
-              src={getPhotoUrl(photo)}
-              alt={photo.title}
-              className={styles.photo}
-              loading="lazy"
-            />
+            <picture>
+              {avifSrcSet && (
+                <source type="image/avif" srcSet={avifSrcSet} sizes={sizes} />
+              )}
+              <img
+                src={thumbUrl}
+                srcSet={webpSrcSet}
+                sizes={sizes}
+                alt={photo.title}
+                className={styles.photo}
+                style={ratio}
+                loading="lazy"
+              />
+            </picture>
             <div className={styles.overlay}>
               <div className={styles.overlayInfo}>
                 {cameraName && (

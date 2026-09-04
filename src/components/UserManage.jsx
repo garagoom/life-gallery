@@ -127,14 +127,15 @@ export default function UserManage() {
       title: '用户',
       key: 'user',
       fixed: 'left',
-      width: 200,
+      width: 220,
+      ellipsis: true,
       render: (_, record) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Avatar src={record.avatar} icon={<UserOutlined />} size={36} />
-          <div>
-            <div style={{ fontWeight: 500 }}>{record.display_name || record.username}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>@{record.username}</div>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <Avatar src={record.avatar} icon={<UserOutlined />} size={36} style={{ flexShrink: 0 }} />
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {record.display_name || record.username}
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', marginLeft: 6 }}>@{record.username}</span>
+          </span>
         </div>
       ),
     },
@@ -150,6 +151,7 @@ export default function UserManage() {
       title: '简介',
       dataIndex: 'bio',
       key: 'bio',
+      width: 160,
       ellipsis: true,
       render: (text) => text || '-',
     },
@@ -157,14 +159,14 @@ export default function UserManage() {
       title: '邮箱',
       dataIndex: 'email',
       key: 'email',
-      ellipsis: true,
+      width: 240,
       render: (text) => text || '-',
     },
     {
       title: '角色',
       dataIndex: 'role',
       key: 'role',
-      width: 100,
+      width: 112,
       align: 'center',
       render: (role) => (
         <Tag color={getColor('role', role)}>{getLabel('role', role)}</Tag>
@@ -190,7 +192,7 @@ export default function UserManage() {
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 108,
       fixed: 'right',
       align: 'center',
       render: (_, record) => (
@@ -231,7 +233,7 @@ export default function UserManage() {
           columns={columns}
           dataSource={users}
           loading={loading}
-          scroll={{ x: 900, y: 'calc(100vh - 160px)' }}
+          scroll={{ x: 1120, y: 'calc(100vh - 160px)' }}
           pagination={{
             current: pagination.page,
             pageSize: pagination.pageSize,
@@ -310,7 +312,9 @@ export default function UserManage() {
           
           <Form.Item name="role" label="角色" rules={[{ required: true }]}>
             <Select>
-              {roles.map(r => (
+              {roles
+                .filter((r) => currentUser?.role === 'admin' || r.value !== 'admin')
+                .map((r) => (
                 <Select.Option key={r.value} value={r.value}>{r.label}</Select.Option>
               ))}
             </Select>

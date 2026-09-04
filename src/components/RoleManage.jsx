@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Button, Modal, Form, Input, InputNumber, Switch, Space, message, Popconfirm, Tree, Empty } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useDict } from '../contexts/DictContext';
+import { getAllMenus } from '../api/menus';
+import { getRoles, getRole, createRole, updateRole, deleteRole } from '../api/roles';
 import ListTable from './ListTable';
 import styles from './Admin.module.css';
 
@@ -18,43 +20,36 @@ export default function RoleManage() {
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
-  const getAuthHeaders = () => ({
-    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-  });
-
   const fetchRoles = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/roles', { cache: 'no-store', headers: getAuthHeaders() });
-      const data = await res.json();
+      const data = await getRoles();
       if (data.code === 200) {
         setRoles([...(data.data || [])]);
       }
     } catch (err) {
-      message.error('获取角色列表失败');
+      message.error(err.message || '获取角色列表失败');
     }
     setLoading(false);
   };
 
   const fetchMenuTree = async () => {
     try {
-      const res = await fetch('/api/menus', { headers: getAuthHeaders() });
-      const data = await res.json();
+      const data = await getAllMenus();
       if (data.code === 200) setMenuTree(data.data);
     } catch (err) {
-      message.error('获取菜单列表失败');
+      message.error(err.message || '获取菜单列表失败');
     }
   };
 
   const fetchRolePermissions = async (roleId) => {
     try {
-      const res = await fetch(`/api/roles/${roleId}`, { headers: getAuthHeaders() });
-      const data = await res.json();
+      const data = await getRole(roleId);
       if (data.code === 200 && data.data.permissions) {
         setCheckedKeys(data.data.permissions.map(p => p.id));
       }
     } catch (err) {
-      message.error('获取角色权限失败');
+      message.error(err.message || '获取角色权限失败');
     }
   };
 
@@ -86,19 +81,11 @@ export default function RoleManage() {
   const handleDelete = async (id) => {
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/roles/${id}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      });
-      const data = await res.json();
-      if (data.code === 200) {
-        message.success('删除成功');
-        fetchRoles();
-      } else {
-        message.error(data.message);
-      }
+      await deleteRole(id);
+      message.success('删除成功');
+      fetchRoles();
     } catch (err) {
-      message.error('删除失败');
+      message.error(err.message || '删除失败');
     } finally {
       setDeletingId(null);
     }
@@ -109,23 +96,17 @@ export default function RoleManage() {
     setSubmitting(true);
     try {
       const values = await form.validateFields();
-      const url = editingRole ? `/api/roles/${editingRole.id}` : '/api/roles';
-      const method = editingRole ? 'PUT' : 'POST';
-      const res = await fetch(url, {
-        method,
-        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...values, permissions: checkedKeys })
-      });
-      const data = await res.json();
-      if (data.code === 200) {
-        message.success(editingRole ? '更新成功' : '创建成功');
-        setModalVisible(false);
-        fetchRoles();
+      const payload = { ...values, permissions: checkedKeys };
+      if (editingRole) {
+        await updateRole(editingRole.id, payload);
       } else {
-        message.error(data.message);
+        await createRole(payload);
       }
+      message.success(editingRole ? '更新成功' : '创建成功');
+      setModalVisible(false);
+      fetchRoles();
     } catch (err) {
-      message.error('操作失败');
+      if (!err.errorFields) message.error(err.message || '操作失败');
     } finally {
       setSubmitting(false);
     }
@@ -143,32 +124,34 @@ export default function RoleManage() {
       title: '角色',
       dataIndex: 'label',
       key: 'label',
+      width: 140,
     },
     {
       title: '标识',
       dataIndex: 'name',
       key: 'name',
+      width: 140,
       render: (v) => <span style={{ color: 'var(--text-secondary)' }}>{v}</span>,
     },
     {
       title: '用户数',
       dataIndex: 'user_count',
       key: 'user_count',
-      width: 80,
+      width: 88,
       align: 'center',
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: 80,
+      width: 88,
       align: 'center',
       render: (val) => <Switch checked={val === 1} disabled size="small" />,
     },
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 108,
       fixed: 'right',
       align: 'center',
       render: (_, record) => (
@@ -194,7 +177,7 @@ export default function RoleManage() {
         <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新建角色</Button>
       </div>
       <div className={styles.tableWrap}>
-        <ListTable columns={columns} dataSource={roles} loading={loading} pagination={false} scroll={{ x: 600, y: 'calc(100vh - 160px)' }} />
+        <ListTable columns={columns} dataSource={roles} loading={loading} pagination={false} scroll={{ x: 720, y: 'calc(100vh - 160px)' }} />
       </div>
 
       <Modal

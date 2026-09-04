@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { getDb, saveDb } = require('../db.cjs');
+const { registerLimiter } = require('../middleware/rateLimit.cjs');
+const { unwrapPassword } = require('../lib/passwordCrypto.cjs');
 
 const DEFAULT_AVATARS = {
   male: '/images/avatars/male.svg',
@@ -10,9 +12,16 @@ const DEFAULT_AVATARS = {
 
 const ALLOWED_ROLES = ['creator', 'viewer'];
 
-router.post('/register', (req, res) => {
+router.post('/register', registerLimiter, (req, res) => {
   try {
-    const { username, password, displayName, email, gender, bio, role } = req.body;
+    const { username, displayName, email, gender, bio, role } = req.body;
+    let password;
+    try {
+      password = unwrapPassword(req.body.password);
+    } catch (err) {
+      return res.status(400).json({ code: 400, message: err.message });
+    }
+
     if (!username || !password) {
       return res.status(400).json({ code: 400, message: '用户名和密码不能为空' });
     }

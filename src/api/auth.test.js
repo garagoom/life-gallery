@@ -1,100 +1,93 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+vi.mock('../utils/encryptPassword', () => ({
+  encryptPassword: async (plain) => `enc:${plain}`,
+  setPasswordPublicKey: () => {},
+}));
+
+function mockRes(body, status = 200) {
+  const raw = JSON.stringify(body);
+  return {
+    status,
+    statusText: 'OK',
+    json: async () => body,
+    text: async () => raw,
+  };
+}
+
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
-
-const localStorageMock = (() => {
-  let store = {};
-  return {
-    getItem: vi.fn((key) => store[key] || null),
-    setItem: vi.fn((key, value) => { store[key] = value; }),
-    removeItem: vi.fn((key) => { delete store[key]; }),
-    clear: vi.fn(() => { store = {}; }),
-  };
-})();
-Object.defineProperty(global, 'localStorage', { value: localStorageMock });
-delete window.location;
-window.location = { href: '' };
 
 describe('API auth.js', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorageMock.clear();
     mockFetch.mockReset();
+    document.cookie = 'lg_csrf=test-csrf';
+    delete window.location;
+    window.location = { href: '', pathname: '/login' };
   });
 
   describe('login', () => {
-    it('should send POST with credentials', async () => {
-      mockFetch.mockResolvedValueOnce({
-        json: async () => ({
+    it('should send encrypted password with credentials', async () => {
+      mockFetch.mockImplementation((url) => {
+        if (String(url).includes('/csrf')) {
+          return Promise.resolve(mockRes({ code: 200, data: { csrfToken: 'test-csrf', passwordPublicKey: 'PEM' } }));
+        }
+        return Promise.resolve(mockRes({
           code: 200,
-          data: { accessToken: 'at', refreshToken: 'rt', user: { username: 'admin' } },
-        }),
+          data: { expiresIn: 900, user: { username: 'admin' } },
+        }));
       });
 
       const { login } = await import('./auth.js');
       const result = await login('admin', 'password123');
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/auth/login'),
-        expect.objectContaining({ method: 'POST' })
-      );
-      expect(result.accessToken).toBe('at');
-    });
-
-    it('should store tokens on success', async () => {
-      mockFetch.mockResolvedValueOnce({
-        json: async () => ({
-          code: 200,
-          data: { accessToken: 'at', refreshToken: 'rt', user: { username: 'admin' } },
-        }),
-      });
-
-      const { login } = await import('./auth.js');
-      await login('admin', 'password123');
-
-      expect(localStorageMock.setItem).toHaveBeenCalledWith('accessToken', 'at');
-      expect(localStorageMock.setItem).toHaveBeenCalledWith('refreshToken', 'rt');
+      const loginCall = mockFetch.mock.calls.find(([url]) => String(url).includes('/auth/login'));
+      expect(loginCall).toBeTruthy();
+      expect(loginCall[1]).toEqual(expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+      }));
+      const body = JSON.parse(loginCall[1].body);
+      expect(body.password).toBe('enc:password123');
+      expect(body.password).not.toBe('password123');
+      expect(result.user.username).toBe('admin');
     });
   });
 
   describe('getProfile', () => {
-    it('should send GET with auth header', async () => {
-      localStorageMock.getItem.mockImplementation((key) => {
-        if (key === 'accessToken') return 'my-token';
-        return null;
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        json: async () => ({ code: 200, data: { username: 'admin' } }),
+    it('should send cookies instead of Authorization header', async () => {
+      mockFetch.mockImplementation((url) => {
+        if (String(url).includes('/csrf')) {
+          return Promise.resolve(mockRes({ code: 200, data: { csrfToken: 'test-csrf' } }));
+        }
+        return Promise.resolve(mockRes({ code: 200, data: { username: 'admin' } }));
       });
 
       const { getProfile } = await import('./auth.js');
       await getProfile();
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/auth/profile'),
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: 'Bearer my-token',
-          }),
-        })
-      );
+      const profileCall = mockFetch.mock.calls.find(([url]) => String(url).includes('/auth/profile'));
+      expect(profileCall[1].credentials).toBe('include');
+      expect(profileCall[1].headers.Authorization).toBeUndefined();
     });
   });
 
   describe('logout', () => {
-    it('should clear tokens', async () => {
-      localStorageMock.getItem.mockReturnValue('some-token');
-      mockFetch.mockResolvedValueOnce({
-        json: async () => ({ code: 200 }),
+    it('should call logout endpoint', async () => {
+      mockFetch.mockImplementation((url) => {
+        if (String(url).includes('/csrf')) {
+          return Promise.resolve(mockRes({ code: 200, data: { csrfToken: 'test-csrf' } }));
+        }
+        return Promise.resolve(mockRes({ code: 200 }));
       });
 
       const { logout } = await import('./auth.js');
       await logout();
 
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith('accessToken');
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith('refreshToken');
+      const logoutCall = mockFetch.mock.calls.find(([url]) => String(url).includes('/auth/logout'));
+      expect(logoutCall).toBeTruthy();
+      expect(window.location.href).toBe('/login');
     });
   });
 });

@@ -29,6 +29,11 @@
   object-fit: cover;
 }
 
+.photoItem picture {
+  display: block;
+  width: 100%;
+}
+
 .overlay {
   position: absolute;
   bottom: 0;

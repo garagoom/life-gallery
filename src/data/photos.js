@@ -66,6 +66,22 @@ export function getThumbnailUrl(photo) {
   return photo.src;
 }
 
+export function getMediumUrl(photo) {
+  if (photo.medium) {
+    return `/mediums/${photo.medium}`;
+  }
+  return null;
+}
+
+export function getDisplayUrl(photo) {
+  return getMediumUrl(photo) || getPhotoUrl(photo);
+}
+
+export function toAvifUrl(url) {
+  if (!url || typeof url !== 'string' || !url.toLowerCase().endsWith('.webp')) return null;
+  return url.replace(/\.webp$/i, '.avif');
+}
+
 // Helper to get camera info string
 export function getCameraInfo(photo) {
   const parts = [];

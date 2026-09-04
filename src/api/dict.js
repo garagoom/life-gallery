@@ -1,18 +1,9 @@
-const API_BASE = '/api';
-const ACCESS_TOKEN_KEY = 'accessToken';
-
-async function request(url) {
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-  const headers = {};
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(url, { headers });
-  return await res.json();
-}
+import { request, API_BASE } from './client';
 
 export function fetchAllDicts() {
-  return request(`${API_BASE}/dict`);
+  return request(`${API_BASE}/dict`, { allowAnonymous: true });
 }
 
 export function fetchDict(type) {
-  return request(`${API_BASE}/dict/${type}`);
+  return request(`${API_BASE}/dict/${type}`, { allowAnonymous: true });
 }

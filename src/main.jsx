@@ -8,6 +8,10 @@ import App from './App.jsx'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import { DictProvider } from './contexts/DictContext'
+import '@fontsource/playfair-display/400.css'
+import '@fontsource/playfair-display/500.css'
+import '@fontsource/playfair-display/600.css'
+import '@fontsource/playfair-display/700.css'
 import './index.css'
 
 dayjs.locale('zh-cn')

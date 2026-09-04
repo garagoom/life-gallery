@@ -146,7 +146,11 @@ Thumbs.db
 # Server data (NEVER commit)
 server/uploads/
 server/thumbnails/
+server/mediums/
+server/keys/
 database.sqlite
+database.sqlite-wal
+database.sqlite-shm
 
 # Environment files
 .env

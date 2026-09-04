@@ -1,19 +1,19 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button, Modal, Form, Input, Select, Upload, Image, Space, Popconfirm, message, Progress, DatePicker, ConfigProvider } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, FolderOpenOutlined, SearchOutlined, ReloadOutlined, TeamOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, FolderOpenOutlined, SearchOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
 import zhCN from 'antd/locale/zh_CN';
 import dayjs from 'dayjs';
-import { getPhotos, uploadPhoto, batchUploadPhotos, updatePhoto, deletePhoto, batchDeletePhotos } from '../api/photos';
-import { getPhotoUrl, getThumbnailUrl } from '../data/photos';
-import { useAuth } from '../contexts/AuthContext';
+import { getPhotos, uploadPhoto, updatePhoto, deletePhoto, batchDeletePhotos } from '../api/photos';
+import { getThumbnailUrl } from '../data/photos';
+import { cachePhoto } from '../utils/imageCache';
 import { useDict } from '../contexts/DictContext';
 import ListTable from './ListTable';
 import styles from './Admin.module.css';
 
 export default function Admin() {
   const navigate = useNavigate();
-  const { hasRole } = useAuth();
+  const location = useLocation();
   const { getColor, getLabel } = useDict();
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -31,6 +31,16 @@ export default function Admin() {
   const [deletingId, setDeletingId] = useState(null);
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [autoDate, setAutoDate] = useState(null);
+  const previewUrlRef = useRef(null);
+
+  const revokePreviewUrl = () => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+  };
+
+  useEffect(() => () => revokePreviewUrl(), []);
   
   const [pagination, setPagination] = useState({
     page: 1,
@@ -81,10 +91,16 @@ export default function Admin() {
     loadPhotos(newPagination.current, newPagination.pageSize, searchParams);
   };
 
+  const handleView = useCallback((record) => {
+    cachePhoto(record.id, record);
+    navigate(`/photography/photo/${record.id}`, { state: { background: location } });
+  }, [navigate, location]);
+
   const handleAdd = () => {
     setEditingPhoto(null);
     form.resetFields();
     setSelectedFile(null);
+    revokePreviewUrl();
     setPreview(null);
     setAutoDate(null);
     setModalOpen(true);
@@ -102,7 +118,8 @@ export default function Admin() {
       title: record.title,
       date: record.date ? dayjs(record.date) : null,
     });
-    setPreview(getPhotoUrl(record));
+    revokePreviewUrl();
+    setPreview(null);
     setSelectedFile(null);
     setAutoDate(null);
     setModalOpen(true);
@@ -141,9 +158,10 @@ export default function Admin() {
 
   const handleFileSelect = (file) => {
     setSelectedFile(file);
-    const reader = new FileReader();
-    reader.onload = (e) => setPreview(e.target.result);
-    reader.readAsDataURL(file);
+    revokePreviewUrl();
+    const url = URL.createObjectURL(file);
+    previewUrlRef.current = url;
+    setPreview(url);
     
     // Auto-fill title from filename
     const fileName = file.name.replace(/\.[^/.]+$/, '');
@@ -186,6 +204,8 @@ export default function Admin() {
       }
 
       setModalOpen(false);
+      revokePreviewUrl();
+      setPreview(null);
       loadPhotos(pagination.page, pagination.pageSize, searchParams);
     } catch (error) {
       if (error.errorFields) return;
@@ -204,21 +224,45 @@ export default function Admin() {
     setBatchUploading(true);
     setBatchProgress(0);
 
-    try {
-      const formData = new FormData();
-      batchFiles.forEach(file => {
-        formData.append('files', file);
-      });
+    const files = [...batchFiles];
+    const total = files.length;
+    let next = 0;
+    let successCount = 0;
+    let failCount = 0;
 
-      const result = await batchUploadPhotos(formData);
-      message.success(result.message || `成功上传 ${batchFiles.length} 张照片`);
+    const worker = async () => {
+      while (next < total) {
+        const index = next;
+        next += 1;
+        const file = files[index];
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('title', file.name.replace(/\.[^.]+$/, '') || '未命名');
+          await uploadPhoto(formData);
+          successCount += 1;
+        } catch {
+          failCount += 1;
+        } finally {
+          setBatchProgress(Math.round(((successCount + failCount) / total) * 100));
+        }
+      }
+    };
+
+    try {
+      await Promise.all(Array.from({ length: Math.min(3, total) }, () => worker()));
+      if (failCount === 0) {
+        message.success(`成功上传 ${successCount} 张照片`);
+      } else {
+        message.warning(`成功 ${successCount} 张，失败 ${failCount} 张`);
+      }
       setBatchModalOpen(false);
+      setBatchFiles([]);
       loadPhotos(1, pagination.pageSize, searchParams);
     } catch (error) {
       message.error(error.message || '批量上传失败');
     } finally {
       setBatchUploading(false);
-      setBatchProgress(0);
     }
   };
 
@@ -233,8 +277,9 @@ export default function Admin() {
           src={getThumbnailUrl(record)}
           width={60}
           height={60}
-          style={{ objectFit: 'cover', borderRadius: 4 }}
+          style={{ objectFit: 'cover', borderRadius: 4, cursor: 'pointer' }}
           preview={false}
+          onClick={() => handleView(record)}
         />
       ),
     },
@@ -242,18 +287,19 @@ export default function Admin() {
       title: '标题',
       dataIndex: 'title',
       key: 'title',
+      width: 180,
       ellipsis: true,
     },
     {
       title: '日期',
       dataIndex: 'date',
       key: 'date',
-      width: 100,
+      width: 120,
     },
     {
       title: '相机',
       key: 'camera',
-      width: 150,
+      width: 200,
       render: (_, record) => {
         if (record.camera_make || record.camera_model) {
           return record.camera_model || record.camera_make || '';
@@ -264,7 +310,7 @@ export default function Admin() {
     {
       title: '参数',
       key: 'settings',
-      width: 180,
+      width: 240,
       render: (_, record) => {
         const parts = [];
         if (record.f_number) parts.push(record.f_number);
@@ -277,7 +323,7 @@ export default function Admin() {
     {
       title: '审核',
       key: 'review_status',
-      width: 80,
+      width: 88,
       render: (_, record) => {
         const colorMap = { orange: '#fa8c16', green: '#52c41a', red: '#ff4d4f' };
         const color = getColor('review_status', record.review_status);
@@ -287,9 +333,14 @@ export default function Admin() {
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 140,
       render: (_, record) => (
         <Space>
+          <Button
+            type="link"
+            icon={<EyeOutlined />}
+            onClick={() => handleView(record)}
+          />
           <Button
             type="link"
             icon={<EditOutlined />}
@@ -315,11 +366,6 @@ export default function Admin() {
         <div className={styles.header}>
           <h2 className={styles.title}>照片管理</h2>
           <Space>
-            {hasRole('module_admin') && (
-              <Button icon={<TeamOutlined />} onClick={() => navigate('/photography/admin/review')}>
-                审核管理
-              </Button>
-            )}
             {selectedRowKeys.length > 0 && (
               <Popconfirm
                 title={`确定删除选中的 ${selectedRowKeys.length} 张照片？`}
@@ -400,7 +446,7 @@ export default function Admin() {
               },
             }}
             onChange={handleTableChange}
-            scroll={{ x: 900, y: 'calc(100vh - 280px)' }}
+            scroll={{ x: 1100, y: 'calc(100vh - 280px)' }}
           />
         </div>
 
@@ -409,7 +455,11 @@ export default function Admin() {
           title={editingPhoto ? '编辑照片' : '添加照片'}
           open={modalOpen}
           onOk={handleSubmit}
-          onCancel={() => setModalOpen(false)}
+          onCancel={() => {
+            revokePreviewUrl();
+            setPreview(null);
+            setModalOpen(false);
+          }}
           okText="确定"
           cancelText="取消"
           confirmLoading={submitting}
@@ -469,7 +519,7 @@ export default function Admin() {
             {editingPhoto && (
               <Form.Item label="当前照片">
                 <Image
-                  src={getPhotoUrl(editingPhoto)}
+                  src={getThumbnailUrl(editingPhoto)}
                   width={200}
                   style={{ borderRadius: 8 }}
                 />

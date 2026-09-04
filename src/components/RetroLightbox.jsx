@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { UserOutlined, ClockCircleOutlined } from '@ant-design/icons';
-import { getPhotoUrl, getThumbnailUrl } from '../data/photos';
+import { getDisplayUrl, getThumbnailUrl } from '../data/photos';
 import { prefetchImage, isImageLoaded } from '../utils/imageCache';
 import ExifInfo from './ExifInfo';
 import styles from './RetroLightbox.module.css';
@@ -31,7 +31,7 @@ export default function RetroLightbox({ photo, photos, onClose, onNavigate }) {
   useEffect(() => {
     if (!photo) return;
     let cancelled = false;
-    const full = getPhotoUrl(photo);
+    const full = getDisplayUrl(photo);
     const thumb = getThumbnailUrl(photo);
 
     setDisplayPhoto(photo);
@@ -56,8 +56,8 @@ export default function RetroLightbox({ photo, photos, onClose, onNavigate }) {
     if (list?.length) {
       const idx = list.findIndex((p) => p.id === photo.id);
       if (idx >= 0) {
-        prefetchImage(getPhotoUrl(list[(idx - 1 + list.length) % list.length]));
-        prefetchImage(getPhotoUrl(list[(idx + 1) % list.length]));
+        prefetchImage(getDisplayUrl(list[(idx - 1 + list.length) % list.length]));
+        prefetchImage(getDisplayUrl(list[(idx + 1) % list.length]));
       }
     }
 

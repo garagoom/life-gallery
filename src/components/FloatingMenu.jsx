@@ -17,34 +17,17 @@ import { useTheme } from '../contexts/ThemeContext';
 import { logout } from '../api/auth';
 import { getMyMenus } from '../api/menus';
 import { iconMap } from '../utils/icons';
+import {
+  EDGE,
+  BUTTON_SIZE,
+  STORAGE_KEY,
+  snapFloatingMenuPos,
+  readStoredPos,
+  defaultPos,
+} from '../utils/floatingMenuPos';
 import styles from './FloatingMenu.module.css';
 
 const { Text } = Typography;
-const BUTTON_SIZE = 56;
-const STORAGE_KEY = 'life-gallery:floating-menu-pos-v2';
-
-function readStoredPos() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (typeof parsed?.x === 'number' && typeof parsed?.y === 'number') return parsed;
-  } catch {}
-  return null;
-}
-
-function clampPos(x, y) {
-  const maxX = Math.max(8, window.innerWidth - BUTTON_SIZE - 8);
-  const maxY = Math.max(8, window.innerHeight - BUTTON_SIZE - 8);
-  return {
-    x: Math.min(maxX, Math.max(8, x)),
-    y: Math.min(maxY, Math.max(8, y)),
-  };
-}
-
-function defaultPos() {
-  return clampPos(window.innerWidth - BUTTON_SIZE - 24, window.innerHeight - BUTTON_SIZE - 96);
-}
 
 const fallbackModules = [
   {
@@ -98,13 +81,14 @@ export default function FloatingMenu() {
   const isDark = theme === 'dark';
   const [loggingOut, setLoggingOut] = useState(false);
   const [modules, setModules] = useState(fallbackModules);
-  const [pos, setPos] = useState(() => {
-    const stored = readStoredPos();
-    return stored ? clampPos(stored.x, stored.y) : defaultPos();
-  });
+  const [pos, setPos] = useState(() => readStoredPos() || defaultPos());
   const [dragging, setDragging] = useState(false);
+  const [snapping, setSnapping] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const skipOpenRef = useRef(false);
+  const nodeRef = useRef(null);
+  const posRef = useRef(pos);
+  posRef.current = pos;
   const dragRef = useRef({
     pointerId: null,
     moved: false,
@@ -114,9 +98,27 @@ export default function FloatingMenu() {
     origY: 0,
   });
 
+  const applyTransform = (x, y) => {
+    if (nodeRef.current) {
+      nodeRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    }
+  };
+
+  useEffect(() => {
+    applyTransform(pos.x, pos.y);
+  }, [pos]);
+
   useEffect(() => {
     const onResize = () => {
-      setPos((current) => clampPos(current.x, current.y));
+      setPos((current) => {
+        const next = snapFloatingMenuPos(
+          current.side === 'left' ? 0 : window.innerWidth,
+          current.y,
+        );
+        posRef.current = next;
+        applyTransform(next.x, next.y);
+        return next;
+      });
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
@@ -152,8 +154,16 @@ export default function FloatingMenu() {
       if (!drag.moved && dx * dx + dy * dy < 25) return;
       drag.moved = true;
       setDragging(true);
+      setSnapping(false);
       setMenuOpen(false);
-      setPos(clampPos(drag.origX + dx, drag.origY + dy));
+      const maxX = Math.max(EDGE, window.innerWidth - BUTTON_SIZE - EDGE);
+      const maxY = Math.max(EDGE, window.innerHeight - BUTTON_SIZE - EDGE);
+      const next = {
+        x: Math.min(maxX, Math.max(EDGE, drag.origX + dx)),
+        y: Math.min(maxY, Math.max(EDGE, drag.origY + dy)),
+      };
+      posRef.current = next;
+      applyTransform(next.x, next.y);
     };
 
     const onUp = (upEvent) => {
@@ -166,15 +176,18 @@ export default function FloatingMenu() {
       dragRef.current.moved = false;
       setDragging(false);
       if (wasDrag) {
-        setPos((current) => {
-          const next = clampPos(current.x, current.y);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-          return next;
-        });
+        const current = posRef.current;
+        const next = snapFloatingMenuPos(current.x, current.y);
+        posRef.current = next;
+        setSnapping(true);
+        setPos(next);
+        applyTransform(next.x, next.y);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ side: next.side, y: next.y }));
         skipOpenRef.current = true;
         window.setTimeout(() => {
           skipOpenRef.current = false;
-        }, 250);
+          setSnapping(false);
+        }, 280);
       }
     };
 
@@ -185,7 +198,7 @@ export default function FloatingMenu() {
 
   const handleOpenChange = (open) => {
     if (dragging || dragRef.current.pointerId != null || skipOpenRef.current) {
-      if (!open) setMenuOpen(false);
+      setMenuOpen(false);
       return;
     }
     setMenuOpen(open);
@@ -339,13 +352,16 @@ export default function FloatingMenu() {
 
   return (
     <div
-      className={`${styles.container}${dragging ? ` ${styles.dragging}` : ''}`}
-      style={{ left: pos.x, top: pos.y }}
+      ref={nodeRef}
+      className={`${styles.container}${dragging ? ` ${styles.dragging}` : ''}${snapping ? ` ${styles.snapping}` : ''}`}
+      style={{ transform: `translate3d(${pos.x}px, ${pos.y}px, 0)` }}
     >
       <Popover
         content={popoverContent}
-        trigger="click"
-        placement="topRight"
+        trigger="hover"
+        mouseEnterDelay={0.05}
+        mouseLeaveDelay={0.15}
+        placement={pos.side === 'left' ? 'topLeft' : 'topRight'}
         overlayClassName={styles.popover}
         arrow={false}
         open={menuOpen}
@@ -353,7 +369,7 @@ export default function FloatingMenu() {
       >
         <div
           className={styles.mainButton}
-          title="拖动可移动，点击打开菜单"
+          title="拖动可移动，悬停打开菜单"
           onPointerDown={handlePointerDown}
         >
           <div className={styles.moduleIcon}>

@@ -33,7 +33,7 @@ describe('Auth Middleware', () => {
 
   it('should accept request with valid token', () => {
     const token = jwt.sign(
-      { id: 1, username: 'admin', role: 'admin' },
+      { id: 1, username: 'admin', role: 'admin', type: 'access' },
       process.env.JWT_SECRET,
       { expiresIn: '15m' }
     );
@@ -47,7 +47,7 @@ describe('Auth Middleware', () => {
 
   it('should reject expired token', () => {
     const token = jwt.sign(
-      { id: 1, username: 'admin', role: 'admin' },
+      { id: 1, username: 'admin', role: 'admin', type: 'access' },
       process.env.JWT_SECRET,
       { expiresIn: '-1s' }
     );

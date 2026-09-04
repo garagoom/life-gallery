@@ -24,7 +24,6 @@
   right: 0;
   z-index: 100;
   display: flex;
-  justify-content: space-between;
   padding: 16px 24px;
   pointer-events: none;
 }
@@ -67,8 +66,10 @@
 
 .photo {
   display: block;
-  width: 100%;
+  max-width: 100%;
   max-height: 80vh;
+  width: auto;
+  height: auto;
   object-fit: contain;
 }
 
@@ -177,6 +178,37 @@
   font-weight: 500;
 }
 
+.paletteRow {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+}
+
+.paletteItem {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.paletteSwatch {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.paletteHex {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .loading,
 .notFound {
   display: flex;
@@ -202,5 +234,9 @@
 
   .exifCard {
     padding: 20px;
+  }
+
+  .paletteRow {
+    grid-template-columns: repeat(3, 1fr);
   }
 }

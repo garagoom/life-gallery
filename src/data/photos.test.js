@@ -3,6 +3,9 @@ import {
   fallbackPhotos,
   getPhotoUrl,
   getThumbnailUrl,
+  getMediumUrl,
+  getDisplayUrl,
+  toAvifUrl,
   getCameraInfo,
   getExposureSettings,
   getRandomPhoto,
@@ -42,6 +45,38 @@ describe('photos.js helpers', () => {
     it('should return src for fallback photos', () => {
       const photo = { src: 'https://example.com/photo.jpg' };
       expect(getThumbnailUrl(photo)).toBe('https://example.com/photo.jpg');
+    });
+  });
+
+  describe('getMediumUrl', () => {
+    it('should return /mediums/medium for backend photos', () => {
+      expect(getMediumUrl({ medium: 'mid-abc.webp' })).toBe('/mediums/mid-abc.webp');
+    });
+
+    it('should return null when no medium', () => {
+      expect(getMediumUrl({ filename: 'abc.webp' })).toBeNull();
+    });
+  });
+
+  describe('getDisplayUrl', () => {
+    it('should prefer medium over original', () => {
+      const photo = { filename: 'abc.webp', medium: 'mid-abc.webp' };
+      expect(getDisplayUrl(photo)).toBe('/mediums/mid-abc.webp');
+    });
+
+    it('should fall back to original when no medium', () => {
+      expect(getDisplayUrl({ filename: 'abc.webp' })).toBe('/uploads/abc.webp');
+    });
+  });
+
+  describe('toAvifUrl', () => {
+    it('should swap webp extension', () => {
+      expect(toAvifUrl('/mediums/mid-abc.webp')).toBe('/mediums/mid-abc.avif');
+    });
+
+    it('should return null for non-webp urls', () => {
+      expect(toAvifUrl('/images/avatars/male.svg')).toBeNull();
+      expect(toAvifUrl(null)).toBeNull();
     });
   });
 

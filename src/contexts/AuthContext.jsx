@@ -1,75 +1,65 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { isAuthenticated, getProfile, getRefreshToken, getTokenExpiration, refreshToken as refreshAuthToken } from '../api/auth';
+import { getProfile, refreshToken as refreshAuthToken } from '../api/auth';
+import { getAccessExpiresAt, ensureCsrf, redirectToLogin } from '../api/client';
 
 const AuthContext = createContext(null);
+const ACCESS_TTL_MS = 15 * 60 * 1000;
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const refreshTimeoutRef = useRef(null);
 
-  const handleTokenRefresh = useCallback(async () => {
-    try {
-      const refreshTokenValue = getRefreshToken();
-      if (!refreshTokenValue) {
-        setUser(null);
-        return;
-      }
-
-      await refreshAuthToken(refreshTokenValue);
-      // Schedule next refresh after successful refresh
-      scheduleNextRefresh();
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-      setUser(null);
-      window.location.href = '/login';
-    }
-  }, []);
-
-  const scheduleNextRefresh = useCallback(() => {
+  const scheduleNextRefresh = useCallback((handleRefresh) => {
     if (refreshTimeoutRef.current) {
       clearTimeout(refreshTimeoutRef.current);
     }
 
-    const expiration = getTokenExpiration();
-    if (!expiration) return;
-
-    // Refresh token 2 minutes before expiration
+    const expiration = getAccessExpiresAt() || (Date.now() + ACCESS_TTL_MS);
     const refreshTime = expiration - Date.now() - 2 * 60 * 1000;
-    
+
     if (refreshTime <= 0) {
-      // Token is already expired or about to expire, refresh immediately
-      handleTokenRefresh();
+      handleRefresh();
       return;
     }
 
     refreshTimeoutRef.current = setTimeout(() => {
-      handleTokenRefresh();
+      handleRefresh();
     }, refreshTime);
-  }, [handleTokenRefresh]);
+  }, []);
+
+  const handleTokenRefresh = useCallback(async () => {
+    try {
+      const data = await refreshAuthToken();
+      if (data?.user) setUser(data.user);
+      scheduleNextRefresh(handleTokenRefresh);
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      setUser(null);
+      redirectToLogin(error?.reason === 'kicked' ? 'kicked' : 'expired');
+    }
+  }, [scheduleNextRefresh]);
 
   useEffect(() => {
     const initAuth = async () => {
-      if (isAuthenticated()) {
-        try {
-          // Check if token is expired
-          if (getTokenExpiration() && Date.now() >= getTokenExpiration() - 30000) {
-            // Token is expired, try to refresh
-            await handleTokenRefresh();
-          } else {
-            // Token is valid, get profile
-            const userData = await getProfile();
-            setUser(userData);
-            // Schedule refresh
-            scheduleNextRefresh();
-          }
-        } catch {
+      try {
+        await ensureCsrf();
+        const userData = await getProfile();
+        if (userData) {
+          setUser(userData);
+          scheduleNextRefresh(handleTokenRefresh);
+        } else {
           setUser(null);
+        }
+      } catch (error) {
+        setUser(null);
+        if (error?.reason === 'kicked' || error?.reason === 'expired') {
+          redirectToLogin(error.reason);
         }
       }
       setLoading(false);
     };
-    
+
     initAuth();
 
     return () => {
@@ -77,13 +67,12 @@ export function AuthProvider({ children }) {
         clearTimeout(refreshTimeoutRef.current);
       }
     };
-  }, []); // Empty dependency array - only run on mount
+  }, []);
 
   const loginUser = useCallback((userData) => {
     setUser(userData);
-    // Schedule token refresh after login
-    scheduleNextRefresh();
-  }, [scheduleNextRefresh]);
+    scheduleNextRefresh(handleTokenRefresh);
+  }, [scheduleNextRefresh, handleTokenRefresh]);
 
   const logoutUser = useCallback(() => {
     if (refreshTimeoutRef.current) {

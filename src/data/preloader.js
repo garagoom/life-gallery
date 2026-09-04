@@ -1,7 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { getRandomPhotos } from '../api/photos';
 import { getThumbnailUrl } from './photos';
-import { isAuthenticated } from '../api/auth';
 import { prefetchImages } from '../utils/imageCache';
 
 const CACHE_KEY = 'preloadedPhotos';
@@ -19,10 +18,6 @@ function cachePhotoJson(photos) {
 
 function doPreload() {
   if (preloadPromise) return preloadPromise;
-
-  if (!isAuthenticated()) {
-    return Promise.resolve([]);
-  }
 
   preloadPromise = (async () => {
     try {

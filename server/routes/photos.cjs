@@ -5,16 +5,26 @@ const fs = require('fs');
 const sharp = require('sharp');
 const exifReader = require('exif-reader');
 const { getDb, saveDb } = require('../db.cjs');
-const { authMiddleware } = require('../middleware/auth.cjs');
-const { requireMenu } = require('../middleware/permission.cjs');
+const { authMiddleware, optionalAuth } = require('../middleware/auth.cjs');
+const { requireMenu, hasMenu } = require('../middleware/permission.cjs');
+const { canViewPhoto } = require('../middleware/media.cjs');
+const { analyzeRgba } = require('../lib/imageAnalysis.cjs');
+const { avifCompanion, encodeAvif } = require('../lib/photoDerivatives.cjs');
 
 const router = express.Router();
 
 // Ensure directories exist
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 const thumbnailsDir = path.join(__dirname, '..', 'thumbnails');
+const mediumsDir = path.join(__dirname, '..', 'mediums');
 fs.mkdirSync(uploadsDir, { recursive: true });
 fs.mkdirSync(thumbnailsDir, { recursive: true });
+fs.mkdirSync(mediumsDir, { recursive: true });
+
+const LIST_FIELDS = `p.id, p.title, p.filename, p.thumbnail, p.medium, p.date, p.category, p.rotation,
+  p.camera_make, p.camera_model, p.exposure_time, p.f_number, p.iso, p.focal_length,
+  p.uploaded_by, p.review_status, p.width, p.height, p.has_avif, p.created_at,
+  u.display_name AS uploader_display_name, u.avatar AS uploader_avatar`;
 
 // Configure multer
 const storage = multer.diskStorage({
@@ -238,35 +248,56 @@ function formatExif(exif) {
 
 // Process and save a single photo file
 async function processPhoto(file, title, date, category) {
-  // New filename as .webp
   const baseName = path.parse(file.filename).name;
   const webpFilename = baseName + '.webp';
   const webpPath = path.join(uploadsDir, webpFilename);
   const thumbnailName = 'thumb-' + baseName + '.webp';
   const thumbnailPath = path.join(thumbnailsDir, thumbnailName);
+  const mediumName = 'mid-' + baseName + '.webp';
+  const mediumPath = path.join(mediumsDir, mediumName);
 
-  // Extract EXIF before conversion
   const exif = await extractExif(file.path);
   const formattedExif = formatExif(exif);
 
-  // Convert original to WebP, limit max width to 3840px (4K)
-  // rotate() without args auto-rotates based on EXIF orientation
-  await sharp(file.path)
-    .rotate()
-    .resize(3840, null, { withoutEnlargement: true })
-    .webp({ quality: 85 })
-    .toFile(webpPath);
+  const pipeline = sharp(file.path).rotate();
+  const [fullInfo, , , sample] = await Promise.all([
+    pipeline
+      .clone()
+      .resize(3840, null, { withoutEnlargement: true })
+      .webp({ quality: 85 })
+      .toFile(webpPath),
+    pipeline
+      .clone()
+      .resize(1200, null, { withoutEnlargement: true })
+      .webp({ quality: 82 })
+      .toFile(mediumPath),
+    pipeline
+      .clone()
+      .resize(300, null, { withoutEnlargement: true })
+      .webp({ quality: 80 })
+      .toFile(thumbnailPath),
+    pipeline
+      .clone()
+      .resize(400, 400, { fit: 'inside' })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true }),
+  ]);
 
-  // Delete original file
-  try { fs.unlinkSync(file.path); } catch (e) { /* ignore */ }
+  try { fs.unlinkSync(file.path); } catch { /* ignore */ }
 
-  // Generate thumbnail as WebP, 300px wide
-  await sharp(webpPath)
-    .rotate()
-    .resize(300, null, { withoutEnlargement: true })
-    .webp({ quality: 80 })
-    .toFile(thumbnailPath);
+  let hasAvif = 0;
+  try {
+    await Promise.all([
+      encodeAvif(webpPath, path.join(mediumsDir, avifCompanion(mediumName)), 1200),
+      encodeAvif(thumbnailPath, path.join(thumbnailsDir, avifCompanion(thumbnailName)), 300),
+    ]);
+    hasAvif = 1;
+  } catch (err) {
+    console.warn('AVIF encode failed:', err.message);
+  }
 
+  const analysis = analyzeRgba(sample.data, sample.info.channels || 4);
   const rotation = (Math.random() * 6 - 3).toFixed(1);
 
   let photoDate = date;
@@ -281,6 +312,12 @@ async function processPhoto(file, title, date, category) {
     title: title || path.parse(file.originalname).name || '未命名',
     filename: webpFilename,
     thumbnail: thumbnailName,
+    medium: mediumName,
+    width: fullInfo.width || null,
+    height: fullInfo.height || null,
+    histogram: JSON.stringify(analysis.histogram),
+    palette: JSON.stringify(analysis.palette),
+    hasAvif,
     date: photoDate,
     category: category || null,
     rotation: parseFloat(rotation),
@@ -303,6 +340,74 @@ async function processPhoto(file, title, date, category) {
   };
 }
 
+function insertPhotoRow(db, photoData, uploadedBy, reviewStatus) {
+  db.run(
+    `INSERT INTO photos (title, filename, thumbnail, medium, width, height, histogram, palette, has_avif, date, category, rotation,
+     camera_make, camera_model, exposure_time, f_number, iso, focal_length,
+     software, lens_model, white_balance, metering_mode, exposure_bias, flash, color_space,
+     latitude, longitude, altitude, uploaded_by, review_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      photoData.title, photoData.filename, photoData.thumbnail, photoData.medium,
+      photoData.width, photoData.height, photoData.histogram, photoData.palette, photoData.hasAvif || 0,
+      photoData.date, photoData.category, photoData.rotation,
+      photoData.cameraMake, photoData.cameraModel, photoData.exposureTime,
+      photoData.fNumber, photoData.iso, photoData.focalLength,
+      photoData.software, photoData.lensModel, photoData.whiteBalance,
+      photoData.meteringMode, photoData.exposureBias, photoData.flash, photoData.colorSpace,
+      photoData.latitude, photoData.longitude, photoData.altitude,
+      uploadedBy, reviewStatus,
+    ]
+  );
+}
+
+function unlinkPhotoFiles(photo) {
+  const names = [
+    [uploadsDir, photo.filename],
+    [thumbnailsDir, photo.thumbnail],
+    [thumbnailsDir, avifCompanion(photo.thumbnail)],
+    [mediumsDir, photo.medium],
+    [mediumsDir, avifCompanion(photo.medium)],
+  ];
+  for (const [dir, name] of names) {
+    if (!name) continue;
+    const target = path.join(dir, name);
+    try { if (fs.existsSync(target)) fs.unlinkSync(target); } catch { /* ignore */ }
+  }
+}
+
+function parseJsonField(value) {
+  if (!value || typeof value !== 'string') return value || null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function hydrateDetail(photo) {
+  return {
+    ...photo,
+    histogram: parseJsonField(photo.histogram),
+    palette: parseJsonField(photo.palette) || [],
+  };
+}
+
+async function mapLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      results[index] = await fn(items[index], index);
+    }
+  }
+  const workers = Array.from({ length: Math.min(limit, items.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
+}
+
 // GET /api/photos/random - Get random photos for homepage
 router.get('/random', (req, res) => {
   try {
@@ -318,24 +423,44 @@ router.get('/random', (req, res) => {
     if (total === 0) {
       return paginate(res, [], { total: 0, count: 0 });
     }
-    
-    // Get random photos using ORDER BY RANDOM()
-    const actualCount = Math.min(count, total);
+
+    const idStmt = db.prepare('SELECT id FROM photos WHERE review_status = 1');
+    const ids = [];
+    while (idStmt.step()) {
+      ids.push(idStmt.getAsObject().id);
+    }
+    idStmt.free();
+
+    if (ids.length === 0) {
+      return paginate(res, [], { total, count: 0 });
+    }
+
+    const actualCount = Math.min(count, ids.length);
+    for (let i = 0; i < actualCount; i++) {
+      const j = i + Math.floor(Math.random() * (ids.length - i));
+      const tmp = ids[i];
+      ids[i] = ids[j];
+      ids[j] = tmp;
+    }
+    const picked = ids.slice(0, actualCount);
+    const placeholders = picked.map(() => '?').join(',');
     const stmt = db.prepare(`
-      SELECT p.*, u.display_name AS uploader_display_name, u.avatar AS uploader_avatar, u.bio AS uploader_bio
+      SELECT ${LIST_FIELDS}
       FROM photos p
       LEFT JOIN users u ON p.uploaded_by = u.username
-      WHERE p.review_status = 1
-      ORDER BY RANDOM() LIMIT ?
+      WHERE p.id IN (${placeholders})
     `);
-    stmt.bind([actualCount]);
-    
-    const photos = [];
+    stmt.bind(picked);
+
+    const byId = new Map();
     while (stmt.step()) {
-      photos.push(stmt.getAsObject());
+      const row = stmt.getAsObject();
+      byId.set(row.id, row);
     }
     stmt.free();
-    
+
+    const photos = picked.map((id) => byId.get(id)).filter(Boolean);
+
     paginate(res, photos, { total, count: photos.length }, '获取成功');
   } catch (err) {
     console.error('Get random photos error:', err);
@@ -396,7 +521,7 @@ router.get('/', authMiddleware, (req, res) => {
     
     const offset = (parseInt(page) - 1) * parseInt(pageSize);
     const dataStmt = db.prepare(
-      `       SELECT p.*, u.display_name AS uploader_display_name, u.avatar AS uploader_avatar, u.bio AS uploader_bio
+      `SELECT ${LIST_FIELDS}
        FROM photos p
        LEFT JOIN users u ON p.uploaded_by = u.username
        ${whereClause} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`
@@ -442,10 +567,7 @@ router.post('/batch-delete', authMiddleware, requireMenu('admin'), (req, res) =>
           stmt.free();
           continue;
         }
-        const uploadPath = path.join(uploadsDir, photo.filename);
-        const thumbPath = path.join(thumbnailsDir, photo.thumbnail);
-        try { if (fs.existsSync(uploadPath)) fs.unlinkSync(uploadPath); } catch (e) {}
-        try { if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath); } catch (e) {}
+        unlinkPhotoFiles(photo);
         db.run('DELETE FROM photos WHERE id = ?', [parseInt(id)]);
         deletedCount++;
       }
@@ -486,7 +608,7 @@ router.get('/review', authMiddleware, requireMenu('review'), (req, res) => {
 
     const offset = (parseInt(page) - 1) * parseInt(pageSize);
     const dataStmt = db.prepare(
-      `SELECT p.*, u.display_name AS uploader_display_name, u.avatar AS uploader_avatar
+      `SELECT ${LIST_FIELDS}
        FROM photos p
        LEFT JOIN users u ON p.uploaded_by = u.username
        ${whereClause} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`
@@ -530,34 +652,49 @@ router.post('/batch-review', authMiddleware, requireMenu('review'), (req, res) =
   }
 });
 
+function visibilitySql(user) {
+  if (user?.role === 'admin' || hasMenu(user, 'review')) {
+    return { sql: '1=1', params: [] };
+  }
+  if (user) {
+    return { sql: '(review_status = 1 OR uploaded_by = ?)', params: [user.username] };
+  }
+  return { sql: 'review_status = 1', params: [] };
+}
+
 // GET /api/photos/:id
-router.get('/:id', (req, res) => {
+router.get('/:id', optionalAuth, (req, res) => {
   try {
     const db = getDb();
+    const photoId = parseInt(req.params.id);
     const stmt = db.prepare(`
       SELECT p.*, u.display_name AS uploader_display_name, u.avatar AS uploader_avatar, u.bio AS uploader_bio
       FROM photos p
       LEFT JOIN users u ON p.uploaded_by = u.username
       WHERE p.id = ?
     `);
-    stmt.bind([parseInt(req.params.id)]);
-    
+    stmt.bind([photoId]);
+
     if (stmt.step()) {
       const photo = stmt.getAsObject();
       stmt.free();
 
-      // Get prev/next IDs for navigation
-      const prevStmt = db.prepare('SELECT id FROM photos WHERE id < ? ORDER BY id DESC LIMIT 1');
-      prevStmt.bind([parseInt(req.params.id)]);
+      if (!canViewPhoto(req.user, photo)) {
+        return error(res, '照片不存在', 404);
+      }
+
+      const vis = visibilitySql(req.user);
+      const prevStmt = db.prepare(`SELECT id FROM photos WHERE id < ? AND ${vis.sql} ORDER BY id DESC LIMIT 1`);
+      prevStmt.bind([photoId, ...vis.params]);
       const prevId = prevStmt.step() ? prevStmt.getAsObject().id : null;
       prevStmt.free();
 
-      const nextStmt = db.prepare('SELECT id FROM photos WHERE id > ? ORDER BY id ASC LIMIT 1');
-      nextStmt.bind([parseInt(req.params.id)]);
+      const nextStmt = db.prepare(`SELECT id FROM photos WHERE id > ? AND ${vis.sql} ORDER BY id ASC LIMIT 1`);
+      nextStmt.bind([photoId, ...vis.params]);
       const nextId = nextStmt.step() ? nextStmt.getAsObject().id : null;
       nextStmt.free();
 
-      success(res, { ...photo, prev_id: prevId, next_id: nextId });
+      success(res, { ...hydrateDetail(photo), prev_id: prevId, next_id: nextId });
     } else {
       stmt.free();
       error(res, '照片不存在', 404);
@@ -582,23 +719,7 @@ router.post('/', authMiddleware, requireMenu('admin'), upload.single('file'), as
     const reviewStatus = req.user?.role === 'admin' ? 1 : 0;
 
     const db = getDb();
-    db.run(
-      `INSERT INTO photos (title, filename, thumbnail, date, category, rotation, 
-       camera_make, camera_model, exposure_time, f_number, iso, focal_length,
-       software, lens_model, white_balance, metering_mode, exposure_bias, flash, color_space, 
-       latitude, longitude, altitude, uploaded_by, review_status) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        photoData.title, photoData.filename, photoData.thumbnail,
-        photoData.date, photoData.category, photoData.rotation,
-        photoData.cameraMake, photoData.cameraModel, photoData.exposureTime,
-        photoData.fNumber, photoData.iso, photoData.focalLength,
-        photoData.software, photoData.lensModel, photoData.whiteBalance,
-        photoData.meteringMode, photoData.exposureBias, photoData.flash, photoData.colorSpace,
-        photoData.latitude, photoData.longitude, photoData.altitude,
-        uploadedBy, reviewStatus,
-      ]
-    );
+    insertPhotoRow(db, photoData, uploadedBy, reviewStatus);
     saveDb();
 
     const stmt = db.prepare('SELECT * FROM photos WHERE id = last_insert_rowid()');
@@ -606,7 +727,7 @@ router.post('/', authMiddleware, requireMenu('admin'), upload.single('file'), as
     const photo = stmt.getAsObject();
     stmt.free();
 
-    success(res, photo, '上传成功', 201);
+    success(res, hydrateDetail(photo), '上传成功', 201);
   } catch (err) {
     console.error('Upload error:', err);
     error(res, '上传失败: ' + err.message);
@@ -628,35 +749,25 @@ router.post('/batch', authMiddleware, requireMenu('admin'), upload.array('files'
     const uploadedBy = req.user ? req.user.username : null;
     const reviewStatus = req.user?.role === 'admin' ? 1 : 0;
 
-    for (const file of req.files) {
+    const processed = await mapLimit(req.files, 3, async (file) => {
       try {
         const photoData = await processPhoto(file, null, null, category);
-
-        db.run(
-          `INSERT INTO photos (title, filename, thumbnail, date, category, rotation,
-           camera_make, camera_model, exposure_time, f_number, iso, focal_length,
-           software, lens_model, white_balance, metering_mode, exposure_bias, flash, color_space,
-           latitude, longitude, altitude, uploaded_by, review_status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            photoData.title, photoData.filename, photoData.thumbnail,
-            photoData.date, photoData.category, photoData.rotation,
-            photoData.cameraMake, photoData.cameraModel, photoData.exposureTime,
-            photoData.fNumber, photoData.iso, photoData.focalLength,
-            photoData.software, photoData.lensModel, photoData.whiteBalance,
-            photoData.meteringMode, photoData.exposureBias, photoData.flash, photoData.colorSpace,
-            photoData.latitude, photoData.longitude, photoData.altitude,
-            uploadedBy, reviewStatus,
-          ]
-        );
-
-        results.push({ success: true, filename: file.originalname });
-        successCount++;
+        return { ok: true, file, photoData };
       } catch (err) {
         console.error(`Error processing ${file.originalname}:`, err);
-        results.push({ success: false, filename: file.originalname, error: err.message });
-        failCount++;
+        return { ok: false, file, error: err.message };
       }
+    });
+
+    for (const item of processed) {
+      if (!item.ok) {
+        results.push({ success: false, filename: item.file.originalname, error: item.error });
+        failCount++;
+        continue;
+      }
+      insertPhotoRow(db, item.photoData, uploadedBy, reviewStatus);
+      results.push({ success: true, filename: item.file.originalname });
+      successCount++;
     }
 
     saveDb();
@@ -739,12 +850,8 @@ router.delete('/:id', authMiddleware, requireMenu('admin'), (req, res) => {
       return error(res, '无权删除此照片', 403);
     }
     
-    const uploadPath = path.join(uploadsDir, photo.filename);
-    const thumbPath = path.join(thumbnailsDir, photo.thumbnail);
-    
-    if (fs.existsSync(uploadPath)) fs.unlinkSync(uploadPath);
-    if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
-    
+    unlinkPhotoFiles(photo);
+
     db.run('DELETE FROM photos WHERE id = ?', [parseInt(req.params.id)]);
     saveDb();
     

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Form, Input, Button, message, Typography, Radio, Space } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined, EditOutlined } from '@ant-design/icons';
+import { register } from '../api/auth';
 import { useDict } from '../contexts/DictContext';
 import styles from './Login.module.css';
 
@@ -24,20 +25,11 @@ export default function Register() {
         email: values.email?.trim(),
         bio: values.bio?.trim(),
       };
-      const res = await fetch('/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(trimmed),
-      });
-      const data = await res.json();
-      if (data.code === 200) {
-        message.success('注册成功，请登录');
-        navigate('/login');
-      } else {
-        message.error(data.message || '注册失败');
-      }
+      await register(trimmed);
+      message.success('注册成功，请登录');
+      navigate('/login');
     } catch (err) {
-      message.error('网络错误');
+      message.error(err.message || '注册失败');
     }
     setLoading(false);
   };

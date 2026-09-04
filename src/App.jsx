@@ -1,24 +1,38 @@
-import { useState, useCallback, useRef } from 'react';
+import { lazy, Suspense, useState, useCallback, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Spin } from 'antd';
 import FloatingMenu from './components/FloatingMenu';
 import HomePage from './components/HomePage';
-import Portfolio from './components/Portfolio';
 import RetroLightbox from './components/RetroLightbox';
-import Admin from './components/Admin';
 import Loading from './components/Loading';
 import Login from './components/Login';
-import Register from './components/Register';
 import ProtectedRoute from './components/ProtectedRoute';
-import UserManage from './components/UserManage';
-import RoleManage from './components/RoleManage';
-import MenuManage from './components/MenuManage';
-import ReviewManage from './components/ReviewManage';
-import Profile from './components/Profile';
-import PhotoDetail from './components/PhotoDetail';
 import { fallbackPhotos } from './data/photos';
 
+const Portfolio = lazy(() => import('./components/Portfolio'));
+const PhotoDetail = lazy(() => import('./components/PhotoDetail'));
+const Admin = lazy(() => import('./components/Admin'));
+const ReviewManage = lazy(() => import('./components/ReviewManage'));
+const UserManage = lazy(() => import('./components/UserManage'));
+const RoleManage = lazy(() => import('./components/RoleManage'));
+const MenuManage = lazy(() => import('./components/MenuManage'));
+const Profile = lazy(() => import('./components/Profile'));
+const Register = lazy(() => import('./components/Register'));
 
 const hideMenuPaths = ['/login', '/register', '/loading'];
+
+function RouteFallback() {
+  return (
+    <div style={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: '100vh',
+    }}>
+      <Spin size="large" />
+    </div>
+  );
+}
 
 function FloatingMenuWrapper() {
   const { pathname } = useLocation();
@@ -31,7 +45,7 @@ function AppRoutes({ handlePhotosLoaded, handlePhotoClick, isPaused, photos }) {
   const background = location.state?.background;
 
   return (
-    <>
+    <Suspense fallback={<RouteFallback />}>
       <Routes location={background || location}>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -105,7 +119,7 @@ function AppRoutes({ handlePhotosLoaded, handlePhotoClick, isPaused, photos }) {
           } />
         </Routes>
       )}
-    </>
+    </Suspense>
   );
 }
 

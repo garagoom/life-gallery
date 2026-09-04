@@ -1,65 +1,8 @@
-const API_BASE = '/api';
-const ACCESS_TOKEN_KEY = 'accessToken';
-const REFRESH_TOKEN_KEY = 'refreshToken';
-
-let isRefreshing = false;
-
-async function request(url, options = {}) {
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-  const headers = { ...options.headers };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const res = await fetch(url, { cache: 'no-store', ...options, headers });
-  const json = await res.json();
-
-  if (json.code === 401 && json.expired && !isRefreshing) {
-    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-    if (refreshToken) {
-      isRefreshing = true;
-      try {
-        const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken })
-        });
-        const refreshJson = await refreshRes.json();
-        if (refreshJson.code === 200) {
-          localStorage.setItem(ACCESS_TOKEN_KEY, refreshJson.data.accessToken);
-          localStorage.setItem(REFRESH_TOKEN_KEY, refreshJson.data.refreshToken);
-          headers['Authorization'] = `Bearer ${refreshJson.data.accessToken}`;
-          const retryRes = await fetch(url, { cache: 'no-store', ...options, headers });
-          isRefreshing = false;
-          return await retryRes.json();
-        }
-      } catch (e) { /* fall through */ }
-      isRefreshing = false;
-    }
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    window.location.href = '/login';
-    throw new Error(json.message);
-  }
-
-  if (json.code === 401) {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    window.location.href = '/login';
-    throw new Error(json.message);
-  }
-
-  if (json.code >= 400) {
-    throw new Error(json.message);
-  }
-
-  return json;
-}
+import { request, API_BASE } from './client';
 
 export async function getPhotos(params = {}) {
   const searchParams = new URLSearchParams();
-  
+
   if (params.category) searchParams.append('category', params.category);
   if (params.title) searchParams.append('title', params.title);
   if (params.dateFrom) searchParams.append('dateFrom', params.dateFrom);
@@ -67,10 +10,10 @@ export async function getPhotos(params = {}) {
   if (params.page) searchParams.append('page', params.page);
   if (params.pageSize) searchParams.append('pageSize', params.pageSize);
   if (params.scope) searchParams.append('scope', params.scope);
-  
+
   const queryString = searchParams.toString();
   const url = `${API_BASE}/photos${queryString ? '?' + queryString : ''}`;
-  
+
   const result = await request(url);
   return {
     data: result.data || [],
@@ -79,7 +22,7 @@ export async function getPhotos(params = {}) {
 }
 
 export async function getRandomPhotos(count = 20) {
-  const result = await request(`${API_BASE}/photos/random?count=${count}`);
+  const result = await request(`${API_BASE}/photos/random?count=${count}`, { allowAnonymous: true });
   return {
     data: result.data || [],
     pagination: result.pagination || { total: 0, count: 0 }
@@ -87,7 +30,7 @@ export async function getRandomPhotos(count = 20) {
 }
 
 export async function getPhotoById(id) {
-  const result = await request(`${API_BASE}/photos/${id}`);
+  const result = await request(`${API_BASE}/photos/${id}`, { allowAnonymous: true });
   return result.data;
 }
 
@@ -102,7 +45,6 @@ export async function uploadPhoto(formData) {
 export async function updatePhoto(id, data) {
   const result = await request(`${API_BASE}/photos/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
   return result.data;
@@ -126,7 +68,6 @@ export async function batchUploadPhotos(formData) {
 export async function batchDeletePhotos(ids) {
   const result = await request(`${API_BASE}/photos/batch-delete`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ids })
   });
   return result;
@@ -149,7 +90,6 @@ export async function getReviewPhotos(params = {}) {
 export async function reviewPhoto(id, review_status) {
   const result = await request(`${API_BASE}/photos/${id}/review`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ review_status })
   });
   return result;
@@ -158,7 +98,6 @@ export async function reviewPhoto(id, review_status) {
 export async function batchReviewPhotos(ids, review_status) {
   const result = await request(`${API_BASE}/photos/batch-review`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ids, review_status })
   });
   return result;

@@ -1,28 +1,18 @@
-const { describe, it, expect, beforeAll, afterAll, beforeEach } = require('vitest');
-const path = require('path');
-const fs = require('fs');
+const { describe, it, expect, beforeAll, afterAll } = require('vitest');
 
-// Set env before importing
 process.env.JWT_SECRET = 'test-jwt-secret';
 process.env.REFRESH_SECRET = 'test-refresh-secret';
 process.env.NODE_ENV = 'test';
+process.env.DB_PATH = ':memory:';
 
-let initDb, getDb, saveDb;
+const { initDb, getDb, saveDb, closeDb } = require('../db.cjs');
 
 beforeAll(async () => {
-  const db = require('../db.cjs');
-  initDb = db.initDb;
-  getDb = db.getDb;
-  saveDb = db.saveDb;
-  // Use in-memory DB for tests
-  process.env.DB_PATH = ':memory:';
-  initDb();
+  await initDb();
 });
 
 afterAll(() => {
-  // Cleanup test DB
-  const dbPath = path.join(__dirname, '..', 'database.sqlite');
-  try { fs.unlinkSync(dbPath); } catch {}
+  closeDb();
 });
 
 describe('Database', () => {
@@ -86,7 +76,6 @@ describe('Database', () => {
     expect(photo.thumbnail).toBe('thumb-test.webp');
     stmt.free();
 
-    // Cleanup
     db.run("DELETE FROM photos WHERE title = 'Test Photo'");
     saveDb();
   });
@@ -110,7 +99,6 @@ describe('Database', () => {
     expect(bcrypt.compareSync('testpass123', user.password)).toBe(true);
     stmt.free();
 
-    // Cleanup
     db.run("DELETE FROM users WHERE username = 'testuser'");
     saveDb();
   });
@@ -132,7 +120,6 @@ describe('Database', () => {
       );
     }).toThrow();
 
-    // Cleanup
     db.run("DELETE FROM users WHERE username = 'unique_test'");
     saveDb();
   });

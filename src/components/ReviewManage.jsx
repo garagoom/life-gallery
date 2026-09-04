@@ -82,18 +82,19 @@ export default function ReviewManage() {
       title: '标题',
       dataIndex: 'title',
       key: 'title',
+      width: 180,
       ellipsis: true,
     },
     {
       title: '上传者',
       key: 'uploader',
-      width: 150,
+      width: 180,
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {record.uploader_avatar ? (
-            <img src={record.uploader_avatar} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} />
+            <img src={record.uploader_avatar} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
           ) : (
-            <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>
+            <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, flexShrink: 0 }}>
               {(record.uploader_display_name || record.uploaded_by || '?').slice(0, 1)}
             </div>
           )}
@@ -105,7 +106,7 @@ export default function ReviewManage() {
       title: '状态',
       dataIndex: 'review_status',
       key: 'review_status',
-      width: 100,
+      width: 88,
       align: 'center',
       render: (val) => {
         return <Tag color={getColor('review_status', val)}>{getLabel('review_status', val)}</Tag>;
@@ -174,7 +175,7 @@ export default function ReviewManage() {
             showTotal: (total) => `共 ${total} 张`,
             onChange: (page, pageSize) => loadPhotos(page, pageSize, statusFilter),
           }}
-          scroll={{ x: 800, y: 'calc(100vh - 200px)' }}
+          scroll={{ x: 900, y: 'calc(100vh - 200px)' }}
         />
       </div>
     </div>

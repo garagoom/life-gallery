@@ -2,16 +2,19 @@ const initSqlJs = require('sql.js');
 const fs = require('fs');
 const path = require('path');
 
-const dbPath = path.join(__dirname, '..', 'database.sqlite');
-
 let db = null;
+let saveTimer = null;
+
+function resolveDbPath() {
+  if (process.env.DB_PATH) return process.env.DB_PATH;
+  return path.join(__dirname, '..', 'database.sqlite');
+}
 
 async function initDb() {
   const SQL = await initSqlJs();
-  
-  if (fs.existsSync(dbPath)) {
-    const buffer = fs.readFileSync(dbPath);
-    db = new SQL.Database(buffer);
+  const dbPath = resolveDbPath();
+  if (dbPath !== ':memory:' && fs.existsSync(dbPath)) {
+    db = new SQL.Database(fs.readFileSync(dbPath));
   } else {
     db = new SQL.Database();
   }
@@ -70,6 +73,11 @@ async function initDb() {
   addColumnIfNotExists('latitude', 'REAL');
   addColumnIfNotExists('longitude', 'REAL');
   addColumnIfNotExists('altitude', 'REAL');
+  addColumnIfNotExists('width', 'INTEGER');
+  addColumnIfNotExists('height', 'INTEGER');
+  addColumnIfNotExists('medium', 'TEXT');
+  addColumnIfNotExists('palette', 'TEXT');
+  addColumnIfNotExists('has_avif', 'INTEGER');
 
   // Add user profile columns if they don't exist
   const addUserColumnIfNotExists = (columnName, columnType) => {
@@ -83,6 +91,7 @@ async function initDb() {
   addUserColumnIfNotExists('gender', 'TEXT');
   addUserColumnIfNotExists('bio', 'TEXT');
   addUserColumnIfNotExists('login_session', 'TEXT');
+  addUserColumnIfNotExists('must_change_password', 'INTEGER DEFAULT 0');
 
   // Add review_status to photos (0=pending, 1=approved, 2=rejected)
   try {
@@ -107,6 +116,11 @@ async function initDb() {
     )
   `);
 
+  addUserColumnIfNotExists('gender', 'TEXT');
+  addUserColumnIfNotExists('bio', 'TEXT');
+  addUserColumnIfNotExists('login_session', 'TEXT');
+  addUserColumnIfNotExists('must_change_password', 'INTEGER DEFAULT 0');
+
   // Create default admin user if not exists
   const adminCheck = db.prepare('SELECT COUNT(*) as count FROM users WHERE username = ?');
   adminCheck.bind(['admin']);
@@ -118,11 +132,12 @@ async function initDb() {
     const bcrypt = require('bcryptjs');
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
     const hashedPassword = bcrypt.hashSync(adminPassword, 10);
+    const mustChange = adminPassword === 'admin123' ? 1 : 0;
     db.run(
-      'INSERT INTO users (username, password, display_name, role) VALUES (?, ?, ?, ?)',
-      ['admin', hashedPassword, '管理员', 'admin']
+      'INSERT INTO users (username, password, display_name, role, must_change_password) VALUES (?, ?, ?, ?, ?)',
+      ['admin', hashedPassword, '管理员', 'admin', mustChange]
     );
-    console.log(`Default admin created: admin / ${adminPassword === 'admin123' ? '(default - CHANGE IN PRODUCTION!)' : '(custom)'}`);
+    console.log(`Default admin created: admin / ${mustChange ? '(default - CHANGE ON FIRST LOGIN)' : '(custom)'}`);
   }
 
   // Create refresh_tokens table
@@ -140,6 +155,9 @@ async function initDb() {
   // Create index for faster lookups
   db.run('CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id)');
   db.run('CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_photos_filename ON photos(filename)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_photos_thumbnail ON photos(thumbnail)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_photos_medium ON photos(medium)');
 
   // Create roles table
   db.run(`
@@ -287,20 +305,45 @@ async function initDb() {
   db.run(`UPDATE users SET avatar = '/images/avatars/male.svg' WHERE avatar IS NULL AND (gender = 'male' OR gender = 'secret' OR gender IS NULL)`);
   db.run(`UPDATE users SET avatar = '/images/avatars/female.svg' WHERE avatar IS NULL AND gender = 'female'`);
 
-  saveDb();
+  flushDb();
   return db;
 }
 
 function saveDb() {
-  if (db) {
-    const data = db.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(dbPath, buffer);
+  scheduleSave();
+}
+
+function scheduleSave() {
+  if (!db) return;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    writeDbFile();
+  }, 400);
+}
+
+function flushDb() {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
   }
+  writeDbFile();
+}
+
+function writeDbFile() {
+  if (!db) return;
+  const dbPath = resolveDbPath();
+  if (dbPath === ':memory:') return;
+  const data = db.export();
+  fs.writeFileSync(dbPath, Buffer.from(data));
+}
+
+function closeDb() {
+  flushDb();
 }
 
 function getDb() {
   return db;
 }
 
-module.exports = { initDb, getDb, saveDb };
+module.exports = { initDb, getDb, saveDb, flushDb, closeDb };

@@ -1,21 +1,42 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Form, Input, Button, message, Typography, Modal } from 'antd';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { Form, Input, Button, message, Typography, Modal, Alert } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { login } from '../api/auth';
+import { consumeAuthNotice } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { useImagePreloader } from '../data/preloader';
 import styles from './Login.module.css';
 
 const { Text } = Typography;
 
+const NOTICE_TEXT = {
+  kicked: '账号已在其他设备登录，请重新登录',
+  expired: '登录已过期，请重新登录',
+};
+
 export default function Login() {
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { loginUser } = useAuth();
 
-  // Start preloading images in background while user is on login page
   useImagePreloader();
+
+  useEffect(() => {
+    const applyNotice = (value) => {
+      if (value === 'kicked' || value === 'expired') setNotice(value);
+    };
+    const fromQuery = searchParams.get('notice');
+    applyNotice(fromQuery === 'kicked' || fromQuery === 'expired' ? fromQuery : consumeAuthNotice());
+
+    const onNotice = (event) => {
+      applyNotice(event.detail || consumeAuthNotice());
+    };
+    window.addEventListener('auth-notice', onNotice);
+    return () => window.removeEventListener('auth-notice', onNotice);
+  }, [searchParams]);
 
   const doLogin = async (username, password, force = false) => {
     const result = await login(username, password, force);
@@ -33,8 +54,9 @@ export default function Login() {
     }
 
     loginUser(result.user);
-    message.success('登录成功');
-    navigate('/loading', { replace: true });
+    setNotice(null);
+    message.success(result.user?.mustChangePassword ? '请先修改初始密码' : '登录成功');
+    navigate(result.user?.mustChangePassword ? '/photography/profile' : '/loading', { replace: true });
   };
 
   const handleSubmit = async (values) => {
@@ -55,7 +77,14 @@ export default function Login() {
           <h1 className={styles.logo}>PHOTO PORTFOLIO</h1>
           <p className={styles.subtitle}>管理系统登录</p>
         </div>
-        
+        {notice && (
+          <Alert
+            type={notice === 'kicked' ? 'warning' : 'info'}
+            showIcon
+            message={NOTICE_TEXT[notice]}
+            style={{ marginBottom: 20 }}
+          />
+        )}
         <Form onFinish={handleSubmit} size="large">
           <Form.Item 
             name="username" 
