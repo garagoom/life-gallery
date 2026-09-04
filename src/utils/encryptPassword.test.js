@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { setPasswordPublicKey, encryptPassword } from './encryptPassword';
+import { setPasswordPublicKey, encryptPassword, isWebCryptoAvailable } from './encryptPassword';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
@@ -20,6 +20,18 @@ describe('encryptPassword', () => {
     const cipher = await encryptPassword('secret-pass-2');
     expect(unwrapPassword(cipher)).toBe('secret-pass-2');
     expect(unwrapPassword('legacy-plain-pass')).toBe('legacy-plain-pass');
+  });
+
+  it('falls back to plaintext when Web Crypto is unavailable', async () => {
+    const originalCrypto = globalThis.crypto;
+    Object.defineProperty(globalThis, 'crypto', { value: {}, configurable: true });
+    try {
+      expect(isWebCryptoAvailable()).toBe(false);
+      setPasswordPublicKey(getPublicKeyPem());
+      await expect(encryptPassword('plain-on-http')).resolves.toBe('plain-on-http');
+    } finally {
+      Object.defineProperty(globalThis, 'crypto', { value: originalCrypto, configurable: true });
+    }
   });
 });
 

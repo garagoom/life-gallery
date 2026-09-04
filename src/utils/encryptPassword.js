@@ -29,6 +29,15 @@ export function setPasswordPublicKey(pem) {
   cryptoKeyPromise = null;
 }
 
+export function isWebCryptoAvailable() {
+  try {
+    return typeof globalThis.crypto?.subtle?.importKey === 'function'
+      && typeof globalThis.crypto?.subtle?.encrypt === 'function';
+  } catch {
+    return false;
+  }
+}
+
 async function importPublicKey() {
   if (!publicKeyPem) {
     throw new Error('加密公钥未就绪');
@@ -49,11 +58,19 @@ export async function encryptPassword(plain) {
   if (typeof plain !== 'string' || !plain) {
     throw new Error('请输入密码');
   }
-  const key = await importPublicKey();
-  const encrypted = await crypto.subtle.encrypt(
-    { name: 'RSA-OAEP' },
-    key,
-    new TextEncoder().encode(plain)
-  );
-  return bufferToBase64(encrypted);
+  if (!isWebCryptoAvailable() || !publicKeyPem) {
+    return plain;
+  }
+  try {
+    const key = await importPublicKey();
+    const encrypted = await crypto.subtle.encrypt(
+      { name: 'RSA-OAEP' },
+      key,
+      new TextEncoder().encode(plain)
+    );
+    return bufferToBase64(encrypted);
+  } catch {
+    cryptoKeyPromise = null;
+    return plain;
+  }
 }
