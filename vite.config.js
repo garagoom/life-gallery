@@ -26,12 +26,14 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (!id.includes('node_modules')) return;
-          if (id.includes('antd') || id.includes('@ant-design')) return 'antd';
-          if (id.includes('react-dom') || id.includes('react-router') || id.includes('/react/') || id.includes('\\react\\')) {
+          const normalized = id.replace(/\\/g, '/');
+          if (
+            normalized.includes('/node_modules/react/') ||
+            normalized.includes('/node_modules/react-dom/') ||
+            normalized.includes('/node_modules/scheduler/')
+          ) {
             return 'react-vendor';
           }
-          return 'vendor';
         },
       },
     },
