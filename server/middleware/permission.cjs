@@ -220,11 +220,7 @@ function canWritePhoto(user, photo) {
   return hasDataPerm(user, 'photos.write.own') && photo.uploaded_by === user.username;
 }
 
-function canReviewPhoto(user, photo) {
-  if (!user || !photo) return false;
-  if (hasDataPerm(user, 'photos.read.all') || hasDataPerm(user, 'review.all')) return true;
-  return photo.uploaded_by === user.username;
-}
+function visibilitySql(user) {
   if (hasDataPerm(user, 'photos.read.all') || hasDataPerm(user, 'photos.review')) {
     return { sql: '1=1', params: [] };
   }

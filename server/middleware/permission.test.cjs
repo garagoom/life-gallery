@@ -9,6 +9,7 @@ const {
   isAdminUser,
   canWritePhoto,
   buildPhotoListFilter,
+  visibilitySql,
 } = require('./permission.cjs');
 
 describe('Permission helpers', () => {
@@ -92,6 +93,15 @@ describe('Permission helpers', () => {
       expect(buildPhotoListFilter(photoAdmin, { scope: 'all' })).toEqual({
         sql: 'p.review_status = 1',
         params: [],
+      });
+    });
+
+    it('builds adjacent-photo visibility sql', () => {
+      expect(visibilitySql(photoAdmin)).toEqual({ sql: '1=1', params: [] });
+      expect(visibilitySql(null)).toEqual({ sql: 'review_status = 1', params: [] });
+      expect(visibilitySql({ username: 'niko', permissions: [] })).toEqual({
+        sql: '(review_status = 1 OR uploaded_by = ?)',
+        params: ['niko'],
       });
     });
   });
