@@ -1,26 +1,30 @@
 import { describe, it, expect } from 'vitest';
-import { getBrandLogo } from './brandLogos';
+import { getBrandLogo, BRANDS } from './brandLogos';
 
 describe('brandLogos', () => {
-  it('should return logo for known brands', () => {
-    expect(getBrandLogo('Nikon')).toBeDefined();
-    expect(getBrandLogo('Canon')).toBeDefined();
-    expect(getBrandLogo('Sony')).toBeDefined();
-    expect(getBrandLogo('FUJIFILM')).toBeDefined();
-    expect(getBrandLogo('Leica')).toBeDefined();
-    expect(getBrandLogo('Hasselblad')).toBeDefined();
-    expect(getBrandLogo('Panasonic')).toBeDefined();
-    expect(getBrandLogo('OLYMPUS')).toBeDefined();
-    expect(getBrandLogo('SIGMA')).toBeDefined();
-    expect(getBrandLogo('Apple')).toBeDefined();
+  it('covers major camera and phone brands', () => {
+    const samples = [
+      'Canon', 'NIKON CORPORATION', 'SONY', 'FUJIFILM', 'LEICA CAMERA AG',
+      'Hasselblad', 'Panasonic', 'OLYMPUS CORPORATION', 'OM Digital Solutions',
+      'PENTAX', 'RICOH IMAGING COMPANY, LTD.', 'SIGMA', 'Apple', 'samsung',
+      'HUAWEI', 'Xiaomi', 'OPPO', 'vivo', 'HONOR', 'realme', 'OnePlus',
+      'Google', 'DJI', 'GoPro', 'Insta360', 'motorola', 'ASUS',
+    ];
+    for (const make of samples) {
+      expect(getBrandLogo(make), make).toBeDefined();
+    }
   });
 
-  it('should be case-insensitive for some brands', () => {
-    const nikon1 = getBrandLogo('Nikon');
-    const nikon2 = getBrandLogo('nikon');
-    expect(nikon1).toBeDefined();
-    // May or may not be same, but should both be defined
-    expect(nikon2).toBeDefined();
+  it('prefers the longest alias so Redmi does not become RED', () => {
+    const redmi = getBrandLogo('Redmi');
+    const red = getBrandLogo('RED');
+    expect(redmi.props.alt).toBe('Redmi');
+    expect(red.props.alt).toBe('RED');
+  });
+
+  it('should be case-insensitive', () => {
+    expect(getBrandLogo('Nikon')).toBeDefined();
+    expect(getBrandLogo('nikon')).toBeDefined();
   });
 
   it('should return null for unknown brand', () => {
@@ -33,5 +37,10 @@ describe('brandLogos', () => {
 
   it('should return null for null', () => {
     expect(getBrandLogo(null)).toBeNull();
+  });
+
+  it('has unique brand ids and logo files', () => {
+    const ids = BRANDS.map((item) => item.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
