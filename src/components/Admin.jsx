@@ -7,6 +7,7 @@ import dayjs from 'dayjs';
 import { getPhotos, uploadPhoto, updatePhoto, deletePhoto, batchDeletePhotos } from '../api/photos';
 import { getThumbnailUrl } from '../data/photos';
 import { cachePhoto } from '../utils/imageCache';
+import { isImageFile } from '../utils/isImageFile';
 import { useDict } from '../contexts/DictContext';
 import ListTable from './ListTable';
 import styles from './Admin.module.css';
@@ -482,7 +483,7 @@ export default function Admin() {
                     e.preventDefault();
                     e.currentTarget.classList.remove(styles.dragOver);
                     const file = e.dataTransfer.files[0];
-                    if (file && file.type.startsWith('image/')) {
+                    if (file && isImageFile(file)) {
                       handleFileSelect(file);
                     }
                   }}
@@ -490,11 +491,13 @@ export default function Admin() {
                   <input
                     id="single-file-input"
                     type="file"
-                    accept="image/*"
+                    accept="image/*,.heic,.heif"
                     style={{ display: 'none' }}
                     onChange={(e) => {
                       const file = e.target.files[0];
-                      if (file) handleFileSelect(file);
+                      if (file && isImageFile(file)) handleFileSelect(file);
+                      else if (file) message.error('只能上传 JPEG、PNG、WebP、HEIC 图片');
+                      e.target.value = '';
                     }}
                   />
                   {preview ? (
@@ -558,7 +561,7 @@ export default function Admin() {
               onDrop={(e) => {
                 e.preventDefault();
                 e.currentTarget.classList.remove(styles.dragOver);
-                const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                const files = Array.from(e.dataTransfer.files).filter((f) => isImageFile(f));
                 setBatchFiles(prev => [...prev, ...files]);
               }}
             >
@@ -566,10 +569,10 @@ export default function Admin() {
                 id="batch-file-input"
                 type="file"
                 multiple
-                accept="image/*"
+                accept="image/*,.heic,.heif"
                 style={{ display: 'none' }}
                 onChange={(e) => {
-                  const files = Array.from(e.target.files);
+                  const files = Array.from(e.target.files).filter((f) => isImageFile(f));
                   setBatchFiles(prev => [...prev, ...files]);
                   e.target.value = '';
                 }}

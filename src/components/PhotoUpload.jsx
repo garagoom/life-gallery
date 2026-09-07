@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Modal, Form, Input, Select, Slider, Upload, Button, message } from 'antd';
+import { Modal, Form, Input, Slider, Upload, message } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import { uploadPhoto } from '../api/photos';
+import { isImageFile } from '../utils/isImageFile';
 import styles from './PhotoUpload.module.css';
 
 export default function PhotoUpload({ open, onClose, onSuccess }) {
@@ -34,7 +35,7 @@ export default function PhotoUpload({ open, onClose, onSuccess }) {
       onSuccess?.();
     } catch (error) {
       if (error.errorFields) return;
-      message.error('上传失败');
+      message.error(error.message || '上传失败');
     } finally {
       setLoading(false);
     }
@@ -49,9 +50,8 @@ export default function PhotoUpload({ open, onClose, onSuccess }) {
 
   const uploadProps = {
     beforeUpload: (file) => {
-      const isImage = file.type.startsWith('image/');
-      if (!isImage) {
-        message.error('只能上传图片文件！');
+      if (!isImageFile(file)) {
+        message.error('只能上传 JPEG、PNG、WebP、HEIC 图片');
         return false;
       }
       const reader = new FileReader();
@@ -61,6 +61,7 @@ export default function PhotoUpload({ open, onClose, onSuccess }) {
       return false;
     },
     showUploadList: false,
+    accept: 'image/*,.heic,.heif',
   };
 
   return (

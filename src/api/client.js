@@ -96,7 +96,12 @@ async function parseJson(res) {
   try {
     return JSON.parse(text);
   } catch {
-    return { code: res.status, message: '响应解析失败', data: null };
+    const status = res.status || 500;
+    let message = '响应解析失败';
+    if (status === 413) message = '文件过大';
+    else if (status === 502 || status === 504) message = '上传超时或服务无响应，请稍后重试';
+    else if (status >= 500) message = '服务器错误';
+    return { code: status, message, data: null };
   }
 }
 

@@ -37,12 +37,33 @@ const storage = multer.diskStorage({
   }
 });
 
+const ALLOWED_MIME = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/pjpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'image/heic-sequence',
+  'image/heif-sequence',
+]);
+const ALLOWED_EXT = /\.(jpe?g|png|webp|heic|heif)$/i;
+
+function isAllowedUpload(file) {
+  const mime = String(file.mimetype || '').toLowerCase();
+  const name = file.originalname || '';
+  if (ALLOWED_MIME.has(mime)) return true;
+  if (mime.startsWith('image/') && ALLOWED_EXT.test(name)) return true;
+  if ((!mime || mime === 'application/octet-stream') && ALLOWED_EXT.test(name)) return true;
+  return false;
+}
+
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
-  if (allowedTypes.includes(file.mimetype)) {
+  if (isAllowedUpload(file)) {
     cb(null, true);
   } else {
-    cb(new Error('仅支持 JPEG、PNG、WebP、HEIC 格式'), false);
+    cb(new Error('仅支持 JPEG、PNG、WebP、HEIC 格式'));
   }
 };
 
@@ -51,6 +72,17 @@ const upload = multer({
   fileFilter,
   limits: { fileSize: 50 * 1024 * 1024 }
 });
+
+function handleMulter(kind) {
+  const handler = kind === 'array' ? upload.array('files', 100) : upload.single('file');
+  return (req, res, next) => {
+    handler(req, res, (err) => {
+      if (!err) return next();
+      const tooLarge = err.code === 'LIMIT_FILE_SIZE';
+      return error(res, tooLarge ? '文件不能超过 50MB' : (err.message || '上传失败'), tooLarge ? 413 : 400);
+    });
+  };
+}
 
 // Standard response helpers
 function success(res, data = null, message = 'success', code = 200) {
@@ -684,7 +716,7 @@ router.get('/:id', optionalAuth, (req, res) => {
 });
 
 // POST /api/photos - Single upload
-router.post('/', authMiddleware, requireMenu('admin'), upload.single('file'), async (req, res) => {
+router.post('/', authMiddleware, requireMenu('admin'), handleMulter('single'), async (req, res) => {
   try {
     if (!req.file) {
       return error(res, '请选择要上传的文件', 400);
@@ -713,7 +745,7 @@ router.post('/', authMiddleware, requireMenu('admin'), upload.single('file'), as
 });
 
 // POST /api/photos/batch - Batch upload
-router.post('/batch', authMiddleware, requireMenu('admin'), upload.array('files', 100), async (req, res) => {
+router.post('/batch', authMiddleware, requireMenu('admin'), handleMulter('array'), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return error(res, '请选择要上传的文件', 400);

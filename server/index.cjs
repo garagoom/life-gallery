@@ -80,6 +80,17 @@ if (isProd) {
   });
 }
 
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  console.error('Unhandled error:', err);
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    code: status,
+    message: err.message || '服务器错误',
+    data: null,
+  });
+});
+
 initDb().then(() => {
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
