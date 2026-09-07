@@ -85,6 +85,10 @@ export default function FloatingMenu() {
   const [dragging, setDragging] = useState(false);
   const [snapping, setSnapping] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [hoverCapable, setHoverCapable] = useState(() => (
+    typeof window !== 'undefined'
+    && window.matchMedia('(hover: hover) and (pointer: fine)').matches
+  ));
   const skipOpenRef = useRef(false);
   const nodeRef = useRef(null);
   const posRef = useRef(pos);
@@ -125,6 +129,14 @@ export default function FloatingMenu() {
   }, []);
 
   useEffect(() => {
+    const mq = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const update = () => setHoverCapable(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
+  useEffect(() => {
     if (!user) return;
     getMyMenus().then(res => {
       const tree = resolveMenuTree(res.data || []);
@@ -134,8 +146,6 @@ export default function FloatingMenu() {
 
   const handlePointerDown = (event) => {
     if (event.button !== undefined && event.button !== 0) return;
-    event.preventDefault();
-    event.stopPropagation();
     const pointerId = event.pointerId;
     dragRef.current = {
       pointerId,
@@ -152,6 +162,8 @@ export default function FloatingMenu() {
       const dx = moveEvent.clientX - drag.startX;
       const dy = moveEvent.clientY - drag.startY;
       if (!drag.moved && dx * dx + dy * dy < 25) return;
+      // 真正开始拖动后再拦截默认行为，避免点按被 preventDefault 吞掉
+      if (moveEvent.cancelable) moveEvent.preventDefault();
       drag.moved = true;
       setDragging(true);
       setSnapping(false);
@@ -191,13 +203,13 @@ export default function FloatingMenu() {
       }
     };
 
-    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointermove', onMove, { passive: false });
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
   };
 
   const handleOpenChange = (open) => {
-    if (dragging || dragRef.current.pointerId != null || skipOpenRef.current) {
+    if (dragging || skipOpenRef.current || dragRef.current.moved) {
       setMenuOpen(false);
       return;
     }
@@ -358,9 +370,9 @@ export default function FloatingMenu() {
     >
       <Popover
         content={popoverContent}
-        trigger="hover"
+        trigger={hoverCapable ? ['hover', 'click'] : 'click'}
         mouseEnterDelay={0.05}
-        mouseLeaveDelay={0.15}
+        mouseLeaveDelay={0.2}
         placement={pos.side === 'left' ? 'topLeft' : 'topRight'}
         overlayClassName={styles.popover}
         arrow={false}
@@ -369,7 +381,7 @@ export default function FloatingMenu() {
       >
         <div
           className={styles.mainButton}
-          title="拖动可移动，悬停打开菜单"
+          title="拖动可移动，悬停或点击打开菜单"
           onPointerDown={handlePointerDown}
         >
           <div className={styles.moduleIcon}>
