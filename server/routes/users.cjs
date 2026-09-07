@@ -2,10 +2,10 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { getDb, saveDb } = require('../db.cjs');
 const { authMiddleware } = require('../middleware/auth.cjs');
-const { requireMenu, isAdminUser } = require('../middleware/permission.cjs');
+const { requireMenu } = require('../middleware/permission.cjs');
 const { revokeUserSessions } = require('../lib/session.cjs');
 const { unwrapPassword } = require('../lib/passwordCrypto.cjs');
-const { roleIdByName, setUserRoles } = require('../lib/userRoles.cjs');
+const { roleIdByName, setUserRoles, assertAssignableRoles, isDefaultAdminUsername } = require('../lib/userRoles.cjs');
 
 const router = express.Router();
 
@@ -16,59 +16,12 @@ const DEFAULT_AVATARS = {
   female: '/images/avatars/female.svg',
 };
 
-const ASSIGNABLE_ROLES = [
-  'admin',
-  'photography_admin',
-  'system_admin',
-  'reviewer',
-  'creator',
-  'viewer',
-  'module_admin',
-];
-const NON_ADMIN_ROLES = [
-  'photography_admin',
-  'system_admin',
-  'reviewer',
-  'creator',
-  'viewer',
-  'module_admin',
-];
-
 function normalizeRoles(body, fallbackRole) {
   const fromArray = Array.isArray(body.roles) ? body.roles.filter(Boolean) : [];
   if (fromArray.length > 0) return [...new Set(fromArray)];
   if (body.role) return [body.role];
   if (fallbackRole) return [fallbackRole];
   return [];
-}
-
-function assertAssignableRoles(actor, roleNames, existingRoles = []) {
-  if (!roleNames.length) {
-    const err = new Error('请至少选择一个角色');
-    err.statusCode = 400;
-    throw err;
-  }
-  for (const role of roleNames) {
-    if (!ASSIGNABLE_ROLES.includes(role)) {
-      const err = new Error('无效的角色');
-      err.statusCode = 400;
-      throw err;
-    }
-  }
-  const existingHasAdmin = existingRoles.includes('admin');
-  const nextHasAdmin = roleNames.includes('admin');
-  if (!isAdminUser(actor)) {
-    if (nextHasAdmin || existingHasAdmin) {
-      const err = new Error('只有超级管理员可以管理超管角色');
-      err.statusCode = 403;
-      throw err;
-    }
-    if (roleNames.some((role) => !NON_ADMIN_ROLES.includes(role))) {
-      const err = new Error('无效的角色');
-      err.statusCode = 400;
-      throw err;
-    }
-  }
 }
 
 function loadUserRoleMap(db, userIds) {
@@ -157,7 +110,7 @@ router.post('/', (req, res) => {
       return res.status(400).json({ code: 400, message: '密码长度需在8-20个字符之间', data: null });
     }
 
-    assertAssignableRoles(req.user, roles);
+    assertAssignableRoles(roles);
 
     const db = getDb();
 
@@ -222,8 +175,10 @@ router.put('/:id', (req, res) => {
     existingRolesStmt.free();
     if (existingRoles.length === 0 && existing.role) existingRoles.push(existing.role);
 
-    const nextRoles = normalizeRoles(req.body, existing.role);
-    assertAssignableRoles(req.user, nextRoles, existingRoles);
+    const nextRoles = isDefaultAdminUsername(existing.username)
+      ? (existingRoles.includes('admin') ? existingRoles : ['admin', ...existingRoles])
+      : normalizeRoles(req.body, existing.role);
+    assertAssignableRoles(nextRoles, { username: existing.username });
 
     const sameRoles = nextRoles.length === existingRoles.length
       && nextRoles.every((role) => existingRoles.includes(role));
@@ -265,6 +220,16 @@ router.put('/:id/status', (req, res) => {
     }
 
     const db = getDb();
+    const userStmt = db.prepare('SELECT username FROM users WHERE id = ?');
+    userStmt.bind([userId]);
+    const target = userStmt.step() ? userStmt.getAsObject() : null;
+    userStmt.free();
+    if (!target) {
+      return res.status(404).json({ code: 404, message: '用户不存在', data: null });
+    }
+    if (isDefaultAdminUsername(target.username)) {
+      return res.status(400).json({ code: 400, message: '不能禁用默认超级管理员', data: null });
+    }
     db.run('UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [status, userId]);
     saveDb();
@@ -288,8 +253,19 @@ router.delete('/:id', (req, res) => {
       return res.status(400).json({ code: 400, message: '不能删除自己的账号', data: null });
     }
 
-    revokeUserSessions(userId);
     const db = getDb();
+    const userStmt = db.prepare('SELECT username FROM users WHERE id = ?');
+    userStmt.bind([userId]);
+    const target = userStmt.step() ? userStmt.getAsObject() : null;
+    userStmt.free();
+    if (!target) {
+      return res.status(404).json({ code: 404, message: '用户不存在', data: null });
+    }
+    if (isDefaultAdminUsername(target.username)) {
+      return res.status(400).json({ code: 400, message: '不能删除默认超级管理员', data: null });
+    }
+
+    revokeUserSessions(userId);
     db.run('DELETE FROM user_roles WHERE user_id = ?', [userId]);
     db.run('DELETE FROM users WHERE id = ?', [userId]);
     saveDb();

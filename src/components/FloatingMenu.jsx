@@ -85,10 +85,6 @@ export default function FloatingMenu() {
   const [dragging, setDragging] = useState(false);
   const [snapping, setSnapping] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [hoverCapable, setHoverCapable] = useState(() => (
-    typeof window !== 'undefined'
-    && window.matchMedia('(hover: hover) and (pointer: fine)').matches
-  ));
   const skipOpenRef = useRef(false);
   const nodeRef = useRef(null);
   const posRef = useRef(pos);
@@ -126,14 +122,6 @@ export default function FloatingMenu() {
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  useEffect(() => {
-    const mq = window.matchMedia('(hover: hover) and (pointer: fine)');
-    const update = () => setHoverCapable(mq.matches);
-    update();
-    mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
   }, []);
 
   useEffect(() => {
@@ -370,9 +358,7 @@ export default function FloatingMenu() {
     >
       <Popover
         content={popoverContent}
-        trigger={hoverCapable ? ['hover', 'click'] : 'click'}
-        mouseEnterDelay={0.05}
-        mouseLeaveDelay={0.2}
+        trigger="click"
         placement={pos.side === 'left' ? 'topLeft' : 'topRight'}
         overlayClassName={styles.popover}
         arrow={false}
@@ -381,7 +367,7 @@ export default function FloatingMenu() {
       >
         <div
           className={styles.mainButton}
-          title="拖动可移动，悬停或点击打开菜单"
+          title="拖动可移动，点击打开菜单"
           onPointerDown={handlePointerDown}
         >
           <div className={styles.moduleIcon}>

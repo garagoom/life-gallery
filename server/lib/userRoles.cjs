@@ -1,3 +1,47 @@
+const DEFAULT_ADMIN_USERNAME = 'admin';
+
+const ASSIGNABLE_ROLES = [
+  'photography_admin',
+  'system_admin',
+  'reviewer',
+  'creator',
+  'viewer',
+  'module_admin',
+];
+
+function isDefaultAdminUsername(username) {
+  return username === DEFAULT_ADMIN_USERNAME;
+}
+
+function httpError(message, statusCode) {
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  return err;
+}
+
+function assertAssignableRoles(roleNames, { username = null } = {}) {
+  if (!Array.isArray(roleNames) || roleNames.length === 0) {
+    throw httpError('请至少选择一个角色', 400);
+  }
+
+  const nextHasAdmin = roleNames.includes('admin');
+  const isDefault = isDefaultAdminUsername(username);
+
+  if (nextHasAdmin && !isDefault) {
+    throw httpError('超级管理员角色不可分配', 403);
+  }
+  if (isDefault && !nextHasAdmin) {
+    throw httpError('不能取消默认超级管理员的超管角色', 400);
+  }
+
+  for (const role of roleNames) {
+    if (role === 'admin' && isDefault) continue;
+    if (!ASSIGNABLE_ROLES.includes(role)) {
+      throw httpError('无效的角色', 400);
+    }
+  }
+}
+
 function roleIdByName(db, name) {
   const stmt = db.prepare('SELECT id, name, level FROM roles WHERE name = ? AND status = 1');
   stmt.bind([name]);
@@ -59,6 +103,10 @@ function countUsersWithRole(db, roleId) {
 }
 
 module.exports = {
+  DEFAULT_ADMIN_USERNAME,
+  ASSIGNABLE_ROLES,
+  isDefaultAdminUsername,
+  assertAssignableRoles,
   roleIdByName,
   loadRoleRows,
   syncPrimaryRole,

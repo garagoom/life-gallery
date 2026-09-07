@@ -131,44 +131,66 @@ router.post('/', authMiddleware, requireMenu('roles'), (req, res) => {
 router.put('/:id', authMiddleware, requireMenu('roles'), (req, res) => {
   try {
     const { name, label, level, status, permissions, dataPermissions } = req.body;
+    const roleId = parseInt(req.params.id, 10);
     const db = getDb();
 
-    const role = db.exec(`SELECT name FROM roles WHERE id = ?`, [req.params.id])[0];
-    if (role && role.values[0][0] === 'admin') {
-      if (name !== 'admin' || level !== 4) {
+    const currentStmt = db.prepare('SELECT name, label, level, status FROM roles WHERE id = ?');
+    currentStmt.bind([roleId]);
+    if (!currentStmt.step()) {
+      currentStmt.free();
+      return res.status(404).json({ code: 404, message: '角色不存在' });
+    }
+    const current = currentStmt.getAsObject();
+    currentStmt.free();
+
+    if (current.name === 'admin') {
+      if ((name && name !== 'admin') || (level != null && Number(level) !== 4)) {
         return res.status(400).json({ code: 400, message: '不能修改超级管理员角色' });
       }
     }
 
-    if (name) {
-      const existing = db.exec(`SELECT id FROM roles WHERE name = ? AND id != ?`,
-        [name, req.params.id])[0];
-      if (existing && existing.values.length > 0) {
+    const nextName = name || current.name;
+    if (nextName !== current.name) {
+      const existingStmt = db.prepare('SELECT id FROM roles WHERE name = ? AND id != ?');
+      existingStmt.bind([nextName, roleId]);
+      const duplicated = existingStmt.step();
+      existingStmt.free();
+      if (duplicated) {
         return res.status(400).json({ code: 400, message: '角色名已存在' });
       }
     }
 
-    db.run(`UPDATE roles SET name = ?, label = ?, level = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [name, label, level, status, req.params.id]);
+    const nextStatus = status == null ? Number(current.status ?? 1) : (Number(status) ? 1 : 0);
+    db.run(
+      `UPDATE roles SET name = ?, label = ?, level = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [
+        nextName,
+        label || current.label,
+        level == null ? current.level : level,
+        nextStatus,
+        roleId,
+      ],
+    );
 
     if (permissions !== undefined) {
-      db.run(`DELETE FROM role_permissions WHERE role_id = ?`, [req.params.id]);
+      db.run(`DELETE FROM role_permissions WHERE role_id = ?`, [roleId]);
       if (permissions.length > 0) {
         const stmt = db.prepare(`INSERT INTO role_permissions (role_id, menu_id) VALUES (?, ?)`);
         permissions.forEach(menuId => {
-          stmt.run([parseInt(req.params.id), menuId]);
+          stmt.run([roleId, menuId]);
         });
         stmt.free();
       }
     }
 
     if (dataPermissions !== undefined) {
-      replaceDataPermissions(db, parseInt(req.params.id, 10), sanitizeDataPermissions(dataPermissions));
+      replaceDataPermissions(db, roleId, sanitizeDataPermissions(dataPermissions));
     }
 
     saveDb();
     res.json({ code: 200, message: '角色更新成功' });
   } catch (error) {
+    console.error('Update role error:', error);
     res.status(500).json({ code: 500, message: error.message });
   }
 });

@@ -90,7 +90,9 @@ export default function UserManage() {
       const trimmed = {
         displayName: values.displayName?.trim(),
         email: values.email?.trim(),
-        roles: values.roles,
+        roles: editingUser?.username === 'admin'
+          ? undefined
+          : (values.roles || []).filter((role) => role !== 'admin'),
         gender: values.gender,
         bio: values.bio?.trim(),
       };
@@ -188,7 +190,7 @@ export default function UserManage() {
         <Switch
           checked={status === 1}
           onChange={(checked) => handleStatusChange(record.id, checked)}
-          disabled={record.id === currentUser?.id || statusLoadingId === record.id}
+          disabled={record.id === currentUser?.id || record.username === 'admin' || statusLoadingId === record.id}
           loading={statusLoadingId === record.id}
           checkedChildren="启用"
           unCheckedChildren="禁用"
@@ -209,7 +211,7 @@ export default function UserManage() {
             icon={<EditOutlined style={{ color: 'var(--accent)' }} />}
             onClick={() => handleEdit(record)}
           />
-          {record.id !== currentUser?.id && (
+          {record.id !== currentUser?.id && record.username !== 'admin' && (
             <Popconfirm
               title="确定删除此用户？"
               onConfirm={() => handleDelete(record.id)}
@@ -316,14 +318,18 @@ export default function UserManage() {
             <Input.TextArea placeholder="输入个人介绍" rows={2} maxLength={200} showCount />
           </Form.Item>
           
-          <Form.Item name="roles" label="角色" rules={[{ required: true, message: '请选择角色' }]}>
-            <Select mode="multiple" placeholder="可多选角色">
-              {roles
-                .filter((r) => currentUser?.roles?.includes('admin') || currentUser?.role === 'admin' || r.value !== 'admin')
-                .map((r) => (
-                <Select.Option key={r.value} value={r.value}>{r.label}</Select.Option>
-              ))}
-            </Select>
+          <Form.Item name="roles" label="角色" rules={editingUser?.username === 'admin' ? [] : [{ required: true, message: '请选择角色' }]}>
+            {editingUser?.username === 'admin' ? (
+              <div style={{ color: 'var(--text-secondary)' }}>超级管理员（系统默认，不可分配）</div>
+            ) : (
+              <Select mode="multiple" placeholder="可多选角色">
+                {roles
+                  .filter((r) => r.value !== 'admin' && r.value !== 'module_admin')
+                  .map((r) => (
+                    <Select.Option key={r.value} value={r.value}>{r.label}</Select.Option>
+                  ))}
+              </Select>
+            )}
           </Form.Item>
         </Form>
       </Modal>
