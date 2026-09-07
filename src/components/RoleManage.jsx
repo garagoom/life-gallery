@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Button, Modal, Form, Input, InputNumber, Switch, Space, message, Popconfirm, Tree, Empty, Checkbox } from 'antd';
+import { Button, Modal, Form, Input, InputNumber, Switch, Space, message, Popconfirm, Tree, Empty } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import { useDict } from '../contexts/DictContext';
 import { getAllMenus } from '../api/menus';
 import { getRoles, getRole, createRole, updateRole, deleteRole } from '../api/roles';
-import { DATA_PERMISSION_OPTIONS } from '../constants/dataPermissions';
+import {
+  composeDataPermissions,
+  selectedMenuKeys,
+  scopedMenuKeys,
+  allScopeKeysFromChecked,
+  checkedKeysFromPermissions,
+  normalizeRoleCheckedKeys,
+  buildRoleTreeData,
+  splitRoleCheckedKeys,
+} from '../constants/dataPermissions';
 import ListTable from './ListTable';
 import styles from './Admin.module.css';
 
@@ -13,11 +21,8 @@ export default function RoleManage() {
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
-  const { getDict } = useDict();
-  const roles_dict = getDict('role');
   const [menuTree, setMenuTree] = useState([]);
   const [checkedKeys, setCheckedKeys] = useState([]);
-  const [dataPerms, setDataPerms] = useState([]);
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
@@ -44,12 +49,15 @@ export default function RoleManage() {
     }
   };
 
-  const fetchRolePermissions = async (roleId) => {
+  const fetchRolePermissions = async (roleId, tree) => {
     try {
       const data = await getRole(roleId);
       if (data.code === 200 && data.data) {
-        setCheckedKeys((data.data.permissions || []).map(p => p.id));
-        setDataPerms(data.data.dataPermissions || []);
+        setCheckedKeys(checkedKeysFromPermissions({
+          permissionIds: (data.data.permissions || []).map((p) => p.id),
+          dataPermissions: data.data.dataPermissions || [],
+          menuTree: tree || menuTree,
+        }));
       }
     } catch (err) {
       message.error(err.message || '获取角色权限失败');
@@ -58,19 +66,10 @@ export default function RoleManage() {
 
   useEffect(() => { fetchRoles(); }, []);
 
-  const buildTreeData = (items) => {
-    return items.map(item => ({
-      title: `${item.label} (${item.type === 'module' ? '模块' : item.type === 'button' ? '按钮' : '菜单'})`,
-      key: item.id,
-      children: item.children ? buildTreeData(item.children) : [],
-    }));
-  };
-
   const handleAdd = async () => {
     setEditingRole(null);
     form.resetFields();
     setCheckedKeys([]);
-    setDataPerms([]);
     await fetchMenuTree();
     setModalVisible(true);
   };
@@ -78,7 +77,10 @@ export default function RoleManage() {
   const handleEdit = async (record) => {
     setEditingRole(record);
     form.setFieldsValue(record);
-    await Promise.all([fetchMenuTree(), fetchRolePermissions(record.id)]);
+    const data = await getAllMenus();
+    const tree = data.code === 200 ? data.data : [];
+    setMenuTree(tree);
+    await fetchRolePermissions(record.id, tree);
     setModalVisible(true);
   };
 
@@ -100,7 +102,18 @@ export default function RoleManage() {
     setSubmitting(true);
     try {
       const values = await form.validateFields();
-      const payload = { ...values, permissions: checkedKeys, dataPermissions: dataPerms };
+      const { menuIds } = splitRoleCheckedKeys(checkedKeys);
+      const menuKeys = selectedMenuKeys(checkedKeys, menuTree);
+      const allScopeKeys = allScopeKeysFromChecked(checkedKeys, menuTree);
+      const payload = {
+        ...values,
+        permissions: menuIds,
+        dataPermissions: composeDataPermissions({
+          menuKeys,
+          allScopeKeys,
+          scopedKeys: scopedMenuKeys(menuTree),
+        }),
+      };
       if (editingRole) {
         await updateRole(editingRole.id, payload);
       } else {
@@ -171,7 +184,7 @@ export default function RoleManage() {
     },
   ];
 
-  const treeData = buildTreeData(menuTree);
+  const treeData = buildRoleTreeData(menuTree);
   const isAdminRole = editingRole?.name === 'admin';
 
   return (
@@ -204,16 +217,19 @@ export default function RoleManage() {
           <Form.Item name="level" label="等级" initialValue={1}>
             <InputNumber min={1} max={4} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item label="菜单权限">
+          <Form.Item
+            label="权限"
+            extra="勾选菜单/按钮表示有操作权；其下「数据」勾选为全站，不勾选只操作自己的数据"
+          >
             {treeData.length > 0 ? (
-              <div style={{ border: '1px solid #d9d9d9', borderRadius: 6, padding: 8, maxHeight: 300, overflow: 'auto' }}>
+              <div style={{ border: '1px solid #d9d9d9', borderRadius: 6, padding: 8, maxHeight: 360, overflow: 'auto' }}>
                 <Tree
                   checkable
                   checkStrictly
                   checkedKeys={checkedKeys}
                   onCheck={(checked) => {
                     const keys = Array.isArray(checked) ? checked : checked.checked;
-                    setCheckedKeys(keys);
+                    setCheckedKeys(normalizeRoleCheckedKeys(keys, checkedKeys));
                   }}
                   treeData={treeData}
                   defaultExpandAll
@@ -222,18 +238,6 @@ export default function RoleManage() {
             ) : (
               <Empty description="暂无菜单数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />
             )}
-          </Form.Item>
-          <Form.Item label="数据权限">
-            <Checkbox.Group
-              value={dataPerms}
-              onChange={setDataPerms}
-              disabled={isAdminRole}
-              style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
-              options={DATA_PERMISSION_OPTIONS.map((item) => ({
-                label: item.label,
-                value: item.code,
-              }))}
-            />
           </Form.Item>
         </Form>
       </Modal>

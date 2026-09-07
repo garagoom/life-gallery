@@ -325,16 +325,20 @@ async function initDb() {
 
   // Add type/visible columns to menus table
   try {
-    db.run(`ALTER TABLE menus ADD COLUMN type TEXT DEFAULT 'menu'`);
+    db.run('ALTER TABLE menus ADD COLUMN type TEXT DEFAULT \'menu\'');
   } catch (e) {}
   try {
-    db.run(`ALTER TABLE menus ADD COLUMN visible INTEGER DEFAULT 1`);
+    db.run('ALTER TABLE menus ADD COLUMN visible INTEGER DEFAULT 1');
+  } catch (e) {}
+  try {
+    db.run('ALTER TABLE menus ADD COLUMN has_data_scope INTEGER DEFAULT 0');
   } catch (e) {}
 
-  // Set type for existing menus
   db.run(`UPDATE menus SET type = 'module' WHERE parent_id IS NULL AND type = 'menu'`);
   db.run(`UPDATE menus SET type = 'button' WHERE key IN ('admin', 'review') AND type = 'menu'`);
   db.run(`UPDATE menus SET type = 'menu' WHERE parent_id IS NOT NULL AND key NOT IN ('admin', 'review') AND type = 'menu'`);
+  db.run(`UPDATE menus SET has_data_scope = 1 WHERE key IN ('admin', 'review', 'users', 'roles', 'menus')`);
+  db.run(`UPDATE menus SET has_data_scope = 0 WHERE key IN ('photography', 'home', 'portfolio', 'system')`);
 
   // Seed menu_type and visible dictionaries
   const menuDicts = [
@@ -370,9 +374,13 @@ async function initDb() {
     )
   `);
 
-  seedRoleDataPerms(db, 'photography_admin', ['photos.read.all', 'photos.write.all', 'photos.review']);
-  seedRoleDataPerms(db, 'system_admin', ['users.manage', 'roles.manage', 'menus.manage']);
-  seedRoleDataPerms(db, 'reviewer', ['photos.read.all', 'photos.review']);
+  seedRoleDataPerms(db, 'photography_admin', [
+    'photos.read.all', 'photos.write.all', 'photos.review', 'admin.all', 'review.all',
+  ]);
+  seedRoleDataPerms(db, 'system_admin', [
+    'users.manage', 'roles.manage', 'menus.manage', 'users.all', 'roles.all', 'menus.all',
+  ]);
+  seedRoleDataPerms(db, 'reviewer', ['photos.read.all', 'photos.review', 'review.all']);
   seedRoleDataPerms(db, 'creator', ['photos.read.own', 'photos.write.own']);
 
   db.run(`UPDATE dictionaries SET status = 0 WHERE type = 'role' AND value = 'module_admin'`);

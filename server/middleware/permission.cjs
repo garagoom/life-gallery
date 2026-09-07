@@ -22,6 +22,21 @@ const DATA_PERM_CODES = [
   'menus.manage',
 ];
 
+const MENU_SCOPE_ALIASES = {
+  'admin.all': ['photos.read.all', 'photos.write.all'],
+  'admin.own': ['photos.read.own', 'photos.write.own'],
+  'review.all': ['photos.read.all', 'photos.review'],
+  'review.own': ['photos.review'],
+  'users.all': ['users.manage'],
+  'roles.all': ['roles.manage'],
+  'menus.all': ['menus.manage'],
+};
+
+function isAllowedDataCode(code) {
+  if (DATA_PERM_CODES.includes(code)) return true;
+  return /^[a-z0-9_]+\.(own|all)$/i.test(String(code || ''));
+}
+
 function isAdminUser(user) {
   if (!user) return false;
   if (Array.isArray(user.roles) && user.roles.includes('admin')) return true;
@@ -93,7 +108,12 @@ function loadUserAccess(userId, { fallbackRole = 'viewer', fallbackRoleId = null
 function hasDataPerm(user, code) {
   if (!user || !code) return false;
   if (isAdminUser(user)) return true;
-  return Array.isArray(user.permissions) && user.permissions.includes(code);
+  const perms = Array.isArray(user.permissions) ? user.permissions : [];
+  if (perms.includes(code)) return true;
+  for (const [scopeCode, aliases] of Object.entries(MENU_SCOPE_ALIASES)) {
+    if (perms.includes(scopeCode) && aliases.includes(code)) return true;
+  }
+  return false;
 }
 
 function requireRole(...roles) {
@@ -200,7 +220,11 @@ function canWritePhoto(user, photo) {
   return hasDataPerm(user, 'photos.write.own') && photo.uploaded_by === user.username;
 }
 
-function visibilitySql(user) {
+function canReviewPhoto(user, photo) {
+  if (!user || !photo) return false;
+  if (hasDataPerm(user, 'photos.read.all') || hasDataPerm(user, 'review.all')) return true;
+  return photo.uploaded_by === user.username;
+}
   if (hasDataPerm(user, 'photos.read.all') || hasDataPerm(user, 'photos.review')) {
     return { sql: '1=1', params: [] };
   }
@@ -227,4 +251,5 @@ module.exports = {
   visibilitySql,
   ROLE_HIERARCHY,
   DATA_PERM_CODES,
+  isAllowedDataCode,
 };

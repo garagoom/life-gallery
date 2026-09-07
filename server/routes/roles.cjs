@@ -2,12 +2,12 @@ const express = require('express');
 const router = express.Router();
 const { getDb, saveDb } = require('../db.cjs');
 const { authMiddleware } = require('../middleware/auth.cjs');
-const { requireMenu, DATA_PERM_CODES } = require('../middleware/permission.cjs');
+const { requireMenu, isAllowedDataCode } = require('../middleware/permission.cjs');
 const { countUsersWithRole } = require('../lib/userRoles.cjs');
 
 function sanitizeDataPermissions(codes) {
   if (!Array.isArray(codes)) return [];
-  return [...new Set(codes.filter((code) => DATA_PERM_CODES.includes(code)))];
+  return [...new Set(codes.filter((code) => isAllowedDataCode(code)))];
 }
 
 function loadDataPermissions(db, roleId) {
