@@ -1,29 +1,47 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { Image } from 'antd';
 import { getPhotoById } from '../api/photos';
 import { getPhotoUrl } from '../data/photos';
 import { getCachedPhoto, cachePhoto } from '../utils/imageCache';
 import {
   extractImageAnalysis,
   parseStoredHistogram,
-  parseStoredPalette,
 } from '../utils/extractImageAnalysis';
 import { formatMeteringMode, formatWhiteBalance, formatExposureBias } from '../utils/exifFormat';
 import CreatorCard from './CreatorCard';
 import RgbWaveform from './RgbWaveform';
 import styles from './PhotoDetail.module.css';
 
+function useHoverPreview() {
+  const [enabled, setEnabled] = useState(() => (
+    typeof window !== 'undefined'
+    && window.matchMedia('(hover: hover) and (pointer: fine)').matches
+  ));
+
+  useEffect(() => {
+    const mq = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const sync = () => setEnabled(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
+  return enabled;
+}
+
 export default function PhotoDetail({ overlay = false }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const overlayRef = useRef(null);
+  const photoSectionRef = useRef(null);
+  const previewOpenRef = useRef(false);
   const [photo, setPhoto] = useState(() => getCachedPhoto(id));
   const [loading, setLoading] = useState(!getCachedPhoto(id));
   const [histogramData, setHistogramData] = useState(null);
-  const [palette, setPalette] = useState([]);
   const [creatorCardOpen, setCreatorCardOpen] = useState(false);
-  const imgRef = useRef(null);
+  const hoverPreview = useHoverPreview();
 
   const handleBack = useCallback(() => {
     if (overlay || location.state?.background) {
@@ -62,24 +80,23 @@ export default function PhotoDetail({ overlay = false }) {
 
   useEffect(() => {
     setHistogramData(null);
-    setPalette([]);
     overlayRef.current?.scrollTo(0, 0);
   }, [id]);
 
   useEffect(() => {
     const handleKey = (e) => {
-      if (e.key === 'Escape') handleBack();
+      if (e.key !== 'Escape') return;
+      if (previewOpenRef.current || document.querySelector('.ant-image-preview')) return;
+      handleBack();
     };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
+    document.addEventListener('keydown', handleKey, true);
+    return () => document.removeEventListener('keydown', handleKey, true);
   }, [handleBack]);
 
   const applyStoredAnalysis = useCallback((nextPhoto) => {
     const storedHistogram = parseStoredHistogram(nextPhoto?.histogram);
-    const storedPalette = parseStoredPalette(nextPhoto?.palette);
     if (storedHistogram) {
       setHistogramData(storedHistogram);
-      setPalette(storedPalette);
       return true;
     }
     return false;
@@ -90,7 +107,6 @@ export default function PhotoDetail({ overlay = false }) {
     try {
       const analysis = extractImageAnalysis(img);
       setHistogramData(analysis.histogram);
-      setPalette(analysis.palette);
     } catch {
       setHistogramData(null);
     }
@@ -100,7 +116,7 @@ export default function PhotoDetail({ overlay = false }) {
     if (!photo) return;
     if (applyStoredAnalysis(photo)) return;
     if (photo.histogram === undefined && photo.palette === undefined) return;
-    const img = imgRef.current;
+    const img = photoSectionRef.current?.querySelector('img');
     if (img?.complete && img.naturalWidth) scanFromImage(img);
   }, [photo, applyStoredAnalysis, scanFromImage]);
 
@@ -146,6 +162,7 @@ export default function PhotoDetail({ overlay = false }) {
     return `${y}/${m}/${day} ${h}:${min}:${sec}`;
   };
 
+  const photoUrl = getPhotoUrl(photo);
   const cameraName = photo.camera_model || photo.camera_make || '';
   const lensName = photo.lens_model || '';
 
@@ -172,15 +189,31 @@ export default function PhotoDetail({ overlay = false }) {
       </div>
 
       <div className={styles.content}>
-        <div className={styles.photoSection}>
-          <img
-            ref={imgRef}
-            src={getPhotoUrl(photo)}
-            alt={photo.title}
-            className={styles.photo}
-            crossOrigin="anonymous"
-            onLoad={handleImgLoad}
-          />
+        <div className={styles.photoSection} ref={photoSectionRef}>
+          {hoverPreview ? (
+            <Image
+              src={photoUrl}
+              alt={photo.title}
+              className={styles.photo}
+              crossOrigin="anonymous"
+              onLoad={handleImgLoad}
+              preview={{
+                src: photoUrl,
+                zIndex: 1100,
+                onOpenChange: (open) => {
+                  previewOpenRef.current = open;
+                },
+              }}
+            />
+          ) : (
+            <img
+              src={photoUrl}
+              alt={photo.title}
+              className={styles.photo}
+              crossOrigin="anonymous"
+              onLoad={handleImgLoad}
+            />
+          )}
         </div>
 
         {cameraName && (
@@ -244,20 +277,6 @@ export default function PhotoDetail({ overlay = false }) {
         {histogramData && (
           <div className={styles.exifCard}>
             <RgbWaveform data={histogramData} />
-          </div>
-        )}
-
-        {palette.length > 0 && (
-          <div className={styles.exifCard}>
-            <h3 className={styles.exifTitle}>主色</h3>
-            <div className={styles.paletteRow}>
-              {palette.map((c) => (
-                <div key={c.hex} className={styles.paletteItem} title={c.hex}>
-                  <span className={styles.paletteSwatch} style={{ background: c.hex }} />
-                  <span className={styles.paletteHex}>{c.hex}</span>
-                </div>
-              ))}
-            </div>
           </div>
         )}
       </div>

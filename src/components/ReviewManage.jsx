@@ -1,13 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button, Image, Space, Popconfirm, Tag, Select, message } from 'antd';
-import { CheckOutlined, CloseOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CheckOutlined, CloseOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
 import { getReviewPhotos, reviewPhoto, batchReviewPhotos } from '../api/photos';
 import { getThumbnailUrl } from '../data/photos';
+import { cachePhoto } from '../utils/imageCache';
 import { useDict } from '../contexts/DictContext';
 import ListTable from './ListTable';
 import styles from './Admin.module.css';
 
 export default function ReviewManage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 20, total: 0 });
@@ -45,6 +49,11 @@ export default function ReviewManage() {
     loadPhotos(1, pagination.pageSize, undefined);
   };
 
+  const handleView = useCallback((record) => {
+    cachePhoto(record.id, record);
+    navigate(`/photography/photo/${record.id}`, { state: { background: location } });
+  }, [navigate, location]);
+
   const handleReview = async (id, review_status) => {
     try {
       await reviewPhoto(id, review_status);
@@ -75,7 +84,14 @@ export default function ReviewManage() {
       key: 'photo',
       width: 80,
       render: (_, record) => (
-        <Image src={getThumbnailUrl(record)} width={60} height={60} style={{ objectFit: 'cover', borderRadius: 4 }} preview={false} />
+        <Image
+          src={getThumbnailUrl(record)}
+          width={60}
+          height={60}
+          style={{ objectFit: 'cover', borderRadius: 4, cursor: 'pointer' }}
+          preview={false}
+          onClick={() => handleView(record)}
+        />
       ),
     },
     {
@@ -115,10 +131,11 @@ export default function ReviewManage() {
     {
       title: '操作',
       key: 'action',
-      width: 140,
+      width: 160,
       align: 'center',
       render: (_, record) => (
         <Space size="small">
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleView(record)} />
           {record.review_status !== 1 && (
             <Popconfirm title="通过审核？" onConfirm={() => handleReview(record.id, 1)} okText="确定" cancelText="取消">
               <Button type="link" size="small" icon={<CheckOutlined style={{ color: '#52c41a' }} />} />

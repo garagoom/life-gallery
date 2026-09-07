@@ -36,7 +36,7 @@ export default function ExifInfo({ photo }) {
   const fNumber = formatFNumber(photo.f_number);
   const iso = photo.iso ? `ISO ${photo.iso}` : null;
   const focal = formatFocalLength(photo.focal_length);
-  const brandLogo = getBrandLogo(photo.camera_make);
+  const brandLogo = getBrandLogo(photo.camera_make, photo.camera_model);
 
   return (
     <div className={styles.container}>

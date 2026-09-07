@@ -1,5 +1,13 @@
 const logoStyle = { height: 20, width: 'auto' };
 
+const COLOR_PNG = new Set([
+  'arri', 'canon', 'casio', 'epson', 'fairphone', 'fujifilm', 'google', 'gopro',
+  'htc', 'huawei', 'insta360', 'itel', 'kodak', 'leica', 'lenovo', 'lg', 'lumix',
+  'meizu', 'microsoft', 'motorola', 'nikon', 'nokia', 'nubia', 'oneplus', 'oppo',
+  'panasonic', 'phaseone', 'poco', 'realme', 'redmi', 'ricoh', 'samsung', 'sharp',
+  'sony', 'tamron', 'tecno', 'vivo', 'xiaomi', 'zeiss', 'zte',
+]);
+
 const BRANDS = [
   { id: 'om-system', label: 'OM SYSTEM', aliases: ['om digital', 'om system'], file: 'omsystem.svg' },
   { id: 'blackmagic', label: 'Blackmagic', aliases: ['blackmagic'], file: 'blackmagicdesign.svg' },
@@ -47,8 +55,8 @@ const BRANDS = [
   { id: 'xiaomi', label: 'Xiaomi', aliases: ['xiaomi'], file: 'xiaomi.svg' },
   { id: 'redmi', label: 'Redmi', aliases: ['redmi'], file: 'redmi.svg' },
   { id: 'poco', label: 'POCO', aliases: ['poco'], file: 'poco.svg' },
-  { id: 'oppo', label: 'OPPO', aliases: ['oppo'], file: 'oppo.svg' },
-  { id: 'vivo', label: 'vivo', aliases: ['vivo'], file: 'vivo.svg' },
+  { id: 'oppo', label: 'OPPO', aliases: ['oppo'], file: 'oppo.svg', models: [/^cph\d+/i, /^p[a-z]{3,4}\d+/i] },
+  { id: 'vivo', label: 'vivo', aliases: ['vivo'], file: 'vivo.svg', models: [/^v\d{4}/i] },
   { id: 'honor', label: 'HONOR', aliases: ['honor'], file: 'honor.svg' },
   { id: 'realme', label: 'realme', aliases: ['realme'], file: 'realme.svg' },
   { id: 'oneplus', label: 'OnePlus', aliases: ['oneplus'], file: 'oneplus.svg' },
@@ -81,27 +89,43 @@ function exactHits(lower, alias) {
   return lower === alias || lower.startsWith(`${alias} `) || lower.endsWith(` ${alias}`);
 }
 
-export function getBrandLogo(make) {
-  if (!make) return null;
-  const lower = String(make).toLowerCase().trim();
+export function getBrandLogo(make, model) {
+  const haystack = [make, model].filter(Boolean).map((v) => String(v).toLowerCase().trim()).join(' ');
+  const modelText = String(model || '').trim();
+  if (!haystack && !modelText) return null;
   let best = null;
   let bestLen = 0;
   for (const brand of BRANDS) {
     for (const alias of brand.aliases) {
-      if (alias.length > bestLen && aliasHits(lower, alias)) {
+      if (alias.length > bestLen && haystack && aliasHits(haystack, alias)) {
         best = brand;
         bestLen = alias.length;
       }
     }
     for (const alias of brand.exact || []) {
-      if (alias.length > bestLen && exactHits(lower, alias)) {
+      if (alias.length > bestLen && haystack && exactHits(haystack, alias)) {
         best = brand;
         bestLen = alias.length;
       }
     }
+    for (const pattern of brand.models || []) {
+      if (modelText && pattern.test(modelText) && bestLen < 6) {
+        best = brand;
+        bestLen = 6;
+      }
+    }
   }
   if (!best) return null;
-  return <img src={`/images/brands/${best.file}`} alt={best.label} style={logoStyle} />;
+  const file = COLOR_PNG.has(best.id) ? `${best.id}.png` : best.file;
+  const isSvg = /\.svg$/i.test(file);
+  return (
+    <img
+      src={`/images/brands/${file}`}
+      alt={best.label}
+      style={logoStyle}
+      data-logo={isSvg ? 'svg' : 'raster'}
+    />
+  );
 }
 
 export { BRANDS };

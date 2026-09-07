@@ -98,7 +98,7 @@ async function parseJson(res) {
   } catch {
     const status = res.status || 500;
     let message = '响应解析失败';
-    if (status === 413) message = '文件过大';
+    if (status === 413) message = '文件过大，单张请不超过 50MB';
     else if (status === 502 || status === 504) message = '上传超时或服务无响应，请稍后重试';
     else if (status >= 500) message = '服务器错误';
     return { code: status, message, data: null };

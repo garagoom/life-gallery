@@ -39,6 +39,14 @@
   flex-shrink: 0;
 }
 
+.brand img[data-logo='svg'] {
+  filter: brightness(0);
+}
+
+:root[data-theme='dark'] .brand img[data-logo='svg'] {
+  filter: brightness(0) invert(1);
+}
+
 .defaultIcon {
   font-size: 12px;
 }

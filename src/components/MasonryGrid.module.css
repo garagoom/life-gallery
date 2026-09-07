@@ -39,8 +39,8 @@
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 40px 14px 14px;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+  padding: 52px 14px 14px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.62) 48%, transparent 100%);
   opacity: 0;
   transition: opacity 0.3s ease;
   pointer-events: none;
@@ -70,6 +70,10 @@
 .brandLogo {
   display: flex;
   align-items: center;
+}
+
+.brandLogo img[data-logo='svg'] {
+  filter: brightness(0) invert(1);
 }
 
 .author {

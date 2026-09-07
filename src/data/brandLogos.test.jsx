@@ -43,4 +43,15 @@ describe('brandLogos', () => {
     const ids = BRANDS.map((item) => item.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
+
+  it('prefers color png logos when available', () => {
+    expect(getBrandLogo('OPPO').props.src).toContain('oppo.png');
+    expect(getBrandLogo('vivo').props['data-logo']).toBe('raster');
+    expect(getBrandLogo('Apple').props.src).toContain('apple.svg');
+  });
+
+  it('matches phone model codes when make is missing', () => {
+    expect(getBrandLogo(null, 'V2419A').props.alt).toBe('vivo');
+    expect(getBrandLogo('', 'CPH2307').props.alt).toBe('OPPO');
+  });
 });
