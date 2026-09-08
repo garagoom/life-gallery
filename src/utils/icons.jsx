@@ -30,6 +30,9 @@ import {
   PlayCircleOutlined,
   SoundOutlined,
   VideoCameraOutlined,
+  CalendarOutlined,
+  AccountBookOutlined,
+  CompassOutlined,
 } from '@ant-design/icons';
 
 export const iconList = [
@@ -63,6 +66,9 @@ export const iconList = [
   { label: '播放', value: 'PlayCircleOutlined', icon: <PlayCircleOutlined /> },
   { label: '视频', value: 'VideoCameraOutlined', icon: <VideoCameraOutlined /> },
   { label: '声音', value: 'SoundOutlined', icon: <SoundOutlined /> },
+  { label: '日历', value: 'CalendarOutlined', icon: <CalendarOutlined /> },
+  { label: '账本', value: 'AccountBookOutlined', icon: <AccountBookOutlined /> },
+  { label: '指南针', value: 'CompassOutlined', icon: <CompassOutlined /> },
 ];
 
 export const iconMap = {};

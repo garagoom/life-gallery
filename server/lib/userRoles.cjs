@@ -3,6 +3,7 @@ const DEFAULT_ADMIN_USERNAME = 'admin';
 const ASSIGNABLE_ROLES = [
   'photography_admin',
   'system_admin',
+  'travel_admin',
   'reviewer',
   'creator',
   'viewer',

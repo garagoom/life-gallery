@@ -24,9 +24,14 @@ function safeFile(dir, name) {
   return { base, full };
 }
 
+function isPublicApproved(photo) {
+  if (Number(photo.review_status) !== 1) return false;
+  return photo.is_public == null || Number(photo.is_public) !== 0;
+}
+
 function canViewPhoto(user, photo) {
   if (!photo) return false;
-  if (Number(photo.review_status) === 1) return true;
+  if (isPublicApproved(photo)) return true;
   if (!user) return false;
   if (hasDataPerm(user, 'photos.read.all') || hasDataPerm(user, 'photos.review')) return true;
   if (photo.uploaded_by && photo.uploaded_by === user.username) return true;
@@ -38,7 +43,7 @@ function lookupPhotoByFile(kind, filename) {
   if (!config) return null;
   const db = getDb();
   const stmt = db.prepare(
-    `SELECT id, filename, thumbnail, medium, review_status, uploaded_by FROM photos WHERE ${config.column} = ?`
+    `SELECT id, filename, thumbnail, medium, review_status, is_public, uploaded_by FROM photos WHERE ${config.column} = ?`
   );
   stmt.bind([lookupName(filename)]);
   const photo = stmt.step() ? stmt.getAsObject() : null;
@@ -65,9 +70,8 @@ function sendMedia(req, res, kind) {
     return res.status(404).end();
   }
 
-  const approved = Number(photo.review_status) === 1;
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  if (approved) {
+  if (isPublicApproved(photo)) {
     res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
   } else {
     res.setHeader('Cache-Control', 'private, no-store');

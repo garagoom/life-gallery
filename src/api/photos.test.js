@@ -193,6 +193,27 @@ describe('API photos.js', () => {
     });
   });
 
+  describe('setPhotoVisibility', () => {
+    it('should send PUT with is_public', async () => {
+      mockFetch.mockImplementation((url) => {
+        if (String(url).includes('/csrf')) {
+          return Promise.resolve(mockRes({ code: 200, data: { csrfToken: 'test-csrf' } }));
+        }
+        return Promise.resolve(mockRes({ code: 200, data: { id: 1, is_public: 0 } }));
+      });
+
+      const { setPhotoVisibility } = await import('./photos.js');
+      const result = await setPhotoVisibility(1, 0);
+
+      const call = mockFetch.mock.calls.find(([url, opts]) => (
+        String(url).includes('/api/photos/1/visibility') && opts?.method === 'PUT'
+      ));
+      expect(call).toBeTruthy();
+      expect(JSON.parse(call[1].body)).toEqual({ is_public: 0 });
+      expect(result).toEqual({ id: 1, is_public: 0 });
+    });
+  });
+
   describe('batchDeletePhotos', () => {
     it('should send POST with ids array', async () => {
       mockFetch.mockImplementation((url) => {

@@ -12,6 +12,10 @@ const rolesRouter = require('./routes/roles.cjs');
 const menusRouter = require('./routes/menus.cjs');
 const registerRouter = require('./routes/register.cjs');
 const dictRouter = require('./routes/dict.cjs');
+const tripsRouter = require('./routes/trips.cjs');
+const budgetsRouter = require('./routes/budgets.cjs');
+const geoRouter = require('./routes/geo.cjs');
+const fxRouter = require('./routes/fx.cjs');
 const { cookieMiddleware } = require('./middleware/cookies.cjs');
 const { csrfMiddleware } = require('./middleware/csrf.cjs');
 const { optionalAuth } = require('./middleware/auth.cjs');
@@ -70,6 +74,10 @@ app.use('/api/users', usersRouter);
 app.use('/api/roles', rolesRouter);
 app.use('/api/menus', menusRouter);
 app.use('/api/dict', dictRouter);
+app.use('/api/trips', tripsRouter);
+app.use('/api/budgets', budgetsRouter);
+app.use('/api/geo', geoRouter);
+app.use('/api/fx', fxRouter);
 app.use('/api', registerRouter);
 
 if (isProd) {

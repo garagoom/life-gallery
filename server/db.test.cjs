@@ -129,6 +129,28 @@ describe('Database', () => {
     saveDb();
   });
 
+  it('should seed travel tables, menus and travel_admin role', () => {
+    const db = getDb();
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('trips', 'trip_days', 'budgets', 'budget_items', 'budget_expenses')");
+    const names = [];
+    while (tables.step()) names.push(tables.getAsObject().name);
+    tables.free();
+    expect(names).toEqual(expect.arrayContaining(['trips', 'trip_days', 'budgets', 'budget_items', 'budget_expenses']));
+
+    const role = db.prepare("SELECT id FROM roles WHERE name = 'travel_admin'");
+    expect(role.step()).toBe(true);
+    role.free();
+
+    const menu = db.prepare("SELECT key, visible FROM menus WHERE key = 'travel_trips'");
+    expect(menu.step()).toBe(true);
+    menu.free();
+
+    const hidden = db.prepare("SELECT visible FROM menus WHERE key = 'travel_home'");
+    hidden.step();
+    expect(hidden.getAsObject().visible).toBe(0);
+    hidden.free();
+  });
+
   it('should insert and retrieve a photo', () => {
     const db = getDb();
     db.run(
@@ -142,6 +164,7 @@ describe('Database', () => {
     const photo = stmt.getAsObject();
     expect(photo.filename).toBe('test.webp');
     expect(photo.thumbnail).toBe('thumb-test.webp');
+    expect(photo.is_public).toBe(1);
     stmt.free();
 
     db.run("DELETE FROM photos WHERE title = 'Test Photo'");

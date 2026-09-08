@@ -113,6 +113,12 @@ export function inferAllScopeKeys(codes = []) {
   if (codes.includes('users.manage')) all.add('users');
   if (codes.includes('roles.manage')) all.add('roles');
   if (codes.includes('menus.manage')) all.add('menus');
+  if (codes.includes('trips.write.all') || codes.includes('trips.read.all')) {
+    all.add('travel_trips');
+  }
+  if (codes.includes('budgets.write.all') || codes.includes('budgets.read.all')) {
+    all.add('travel_budget');
+  }
   return [...all];
 }
 
@@ -151,6 +157,26 @@ export function composeDataPermissions({
   if (keys.has('users') && all.has('users')) codes.add('users.manage');
   if (keys.has('roles') && all.has('roles')) codes.add('roles.manage');
   if (keys.has('menus') && all.has('menus')) codes.add('menus.manage');
+
+  if (keys.has('travel_trips') && withScope('travel_trips')) {
+    if (all.has('travel_trips')) {
+      codes.add('trips.read.all');
+      codes.add('trips.write.all');
+    } else {
+      codes.add('trips.read.own');
+      codes.add('trips.write.own');
+    }
+  }
+
+  if (keys.has('travel_budget') && withScope('travel_budget')) {
+    if (all.has('travel_budget')) {
+      codes.add('budgets.read.all');
+      codes.add('budgets.write.all');
+    } else {
+      codes.add('budgets.read.own');
+      codes.add('budgets.write.own');
+    }
+  }
 
   return [...codes];
 }

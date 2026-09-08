@@ -11,6 +11,9 @@ import {
   AppstoreOutlined,
   BulbOutlined,
   BulbFilled,
+  EnvironmentOutlined,
+  CalendarOutlined,
+  AccountBookOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -39,6 +42,16 @@ const fallbackModules = [
       { key: 'home', label: '首页', path: '/photography/home', icon: <HomeOutlined /> },
       { key: 'portfolio', label: '作品集', path: '/photography/portfolio', icon: <PictureOutlined /> },
       { key: 'admin', label: '管理', path: '/photography/admin', icon: <SettingOutlined /> },
+    ]
+  },
+  {
+    key: 'travel',
+    label: '旅游',
+    icon: <EnvironmentOutlined />,
+    path: '/travel',
+    children: [
+      { key: 'travel_trips', label: '出游计划', path: '/travel/trips', icon: <CalendarOutlined /> },
+      { key: 'travel_budget', label: '预算总览', path: '/travel/budget', icon: <AccountBookOutlined /> },
     ]
   },
 ];

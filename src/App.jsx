@@ -18,6 +18,10 @@ const RoleManage = lazy(() => import('./components/RoleManage'));
 const MenuManage = lazy(() => import('./components/MenuManage'));
 const Profile = lazy(() => import('./components/Profile'));
 const Register = lazy(() => import('./components/Register'));
+const TripList = lazy(() => import('./components/travel/TripList'));
+const TripDetail = lazy(() => import('./components/travel/TripDetail'));
+const BudgetOverview = lazy(() => import('./components/travel/BudgetOverview'));
+const BudgetDetail = lazy(() => import('./components/travel/BudgetDetail'));
 
 const hideMenuPaths = ['/login', '/register', '/loading'];
 
@@ -104,6 +108,29 @@ function AppRoutes({ handlePhotosLoaded, handlePhotoClick, isPaused, photos }) {
             <Profile />
           </ProtectedRoute>
         } />
+
+        <Route path="/travel/trips" element={
+          <ProtectedRoute>
+            <TripList />
+          </ProtectedRoute>
+        } />
+        <Route path="/travel/trips/:id" element={
+          <ProtectedRoute>
+            <TripDetail />
+          </ProtectedRoute>
+        } />
+        <Route path="/travel/budget" element={
+          <ProtectedRoute>
+            <BudgetOverview />
+          </ProtectedRoute>
+        } />
+        <Route path="/travel/budget/:id" element={
+          <ProtectedRoute>
+            <BudgetDetail />
+          </ProtectedRoute>
+        } />
+        <Route path="/travel/home" element={<Navigate to="/travel/trips" replace />} />
+        <Route path="/travel" element={<Navigate to="/travel/trips" replace />} />
 
         <Route path="/" element={<Navigate to="/photography/home" replace />} />
         <Route path="/photography" element={<Navigate to="/photography/home" replace />} />

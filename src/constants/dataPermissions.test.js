@@ -79,9 +79,42 @@ describe('dataPermissions', () => {
     })).toEqual(expect.arrayContaining(['users.all', 'users.manage', 'roles.own']));
   });
 
+  it('maps travel menus to trips and budgets own/all codes', () => {
+    const own = composeDataPermissions({
+      menuKeys: ['travel_trips', 'travel_budget'],
+      allScopeKeys: [],
+      scopedKeys: ['travel_trips', 'travel_budget'],
+    });
+    expect(own).toEqual(expect.arrayContaining([
+      'travel_trips.own',
+      'travel_budget.own',
+      'trips.read.own',
+      'trips.write.own',
+      'budgets.read.own',
+      'budgets.write.own',
+    ]));
+    expect(own).not.toContain('trips.write.all');
+    expect(own).not.toContain('budgets.write.all');
+
+    const all = composeDataPermissions({
+      menuKeys: ['travel_trips'],
+      allScopeKeys: ['travel_trips'],
+      scopedKeys: ['travel_trips'],
+    });
+    expect(all).toEqual(expect.arrayContaining(['travel_trips.all', 'trips.read.all', 'trips.write.all']));
+    expect(all).not.toContain('budgets.read.all');
+  });
+
   it('infers 全站 keys from stored codes', () => {
     expect(inferAllScopeKeys(['admin.all', 'photos.write.all', 'users.manage'])).toEqual(
       expect.arrayContaining(['admin', 'users'])
+    );
+    expect(inferAllScopeKeys(['trips.write.all'])).toEqual(
+      expect.arrayContaining(['travel_trips'])
+    );
+    expect(inferAllScopeKeys(['trips.write.all'])).not.toContain('travel_budget');
+    expect(inferAllScopeKeys(['budgets.write.all'])).toEqual(
+      expect.arrayContaining(['travel_budget'])
     );
   });
 

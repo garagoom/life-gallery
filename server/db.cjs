@@ -126,6 +126,10 @@ async function initDb() {
   addColumnIfNotExists('medium', 'TEXT');
   addColumnIfNotExists('palette', 'TEXT');
   addColumnIfNotExists('has_avif', 'INTEGER');
+  addColumnIfNotExists('is_public', 'INTEGER DEFAULT 1');
+  try {
+    db.run('UPDATE photos SET is_public = 1 WHERE is_public IS NULL');
+  } catch (e) {}
 
   // Add user profile columns if they don't exist
   const addUserColumnIfNotExists = (columnName, columnType) => {
@@ -257,6 +261,7 @@ async function initDb() {
   db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('admin', '超级管理员', 4)`);
   db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('photography_admin', '摄影模块管理员', 3)`);
   db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('system_admin', '系统模块管理员', 3)`);
+  db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('travel_admin', '旅游模块管理员', 3)`);
   db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('reviewer', '图片审核员', 2)`);
   db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('creator', '创作者', 2)`);
   db.run(`INSERT OR IGNORE INTO roles (name, label, level) VALUES ('viewer', '访客', 1)`);
@@ -271,13 +276,18 @@ async function initDb() {
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (6, 5, 'users', '用户管理', 'TeamOutlined', '/photography/admin/users', 1)`);
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (7, 5, 'roles', '角色管理', 'SafetyOutlined', '/photography/admin/roles', 2)`);
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (8, 5, 'menus', '菜单管理', 'MenuOutlined', '/photography/admin/menus', 3)`);
+  db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (10, NULL, 'travel', '旅游', 'EnvironmentOutlined', '/travel', 2)`);
+  db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (11, 10, 'travel_trips', '出游计划', 'CalendarOutlined', '/travel/trips', 1)`);
+  db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (12, 10, 'travel_budget', '预算总览', 'AccountBookOutlined', '/travel/budget', 2)`);
+  db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (13, 10, 'travel_home', '旅程', 'CompassOutlined', '/travel/home', 3)`);
 
   // Assign default permissions
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'admin'`);
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'photography_admin' AND m.id IN (1, 2, 3, 4, 9)`);
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'system_admin' AND m.id IN (5, 6, 7, 8)`);
+  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'travel_admin' AND m.key IN ('travel', 'travel_trips', 'travel_budget', 'travel_home')`);
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'reviewer' AND m.id IN (1, 9)`);
-  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'creator' AND m.id IN (1, 2, 3)`);
+  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'creator' AND m.key IN ('photography', 'home', 'portfolio', 'travel', 'travel_trips', 'travel_budget')`);
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'viewer' AND m.id IN (1, 2, 3)`);
 
   // Create dictionaries table
@@ -301,6 +311,7 @@ async function initDb() {
     ['role', 'admin', '超级管理员', 'red', 4, 1],
     ['role', 'photography_admin', '摄影模块管理员', 'orange', 3, 2],
     ['role', 'system_admin', '系统模块管理员', 'gold', 3, 3],
+    ['role', 'travel_admin', '旅游模块管理员', 'cyan', 3, 7],
     ['role', 'reviewer', '图片审核员', 'purple', 2, 4],
     ['role', 'creator', '创作者', 'blue', 2, 5],
     ['role', 'viewer', '访客', 'default', 1, 6],
@@ -337,8 +348,9 @@ async function initDb() {
   db.run(`UPDATE menus SET type = 'module' WHERE parent_id IS NULL AND type = 'menu'`);
   db.run(`UPDATE menus SET type = 'button' WHERE key IN ('admin', 'review') AND type = 'menu'`);
   db.run(`UPDATE menus SET type = 'menu' WHERE parent_id IS NOT NULL AND key NOT IN ('admin', 'review') AND type = 'menu'`);
-  db.run(`UPDATE menus SET has_data_scope = 1 WHERE key IN ('admin', 'review', 'users', 'roles', 'menus')`);
-  db.run(`UPDATE menus SET has_data_scope = 0 WHERE key IN ('photography', 'home', 'portfolio', 'system')`);
+  db.run(`UPDATE menus SET has_data_scope = 1 WHERE key IN ('admin', 'review', 'users', 'roles', 'menus', 'travel_trips', 'travel_budget')`);
+  db.run(`UPDATE menus SET has_data_scope = 0 WHERE key IN ('photography', 'home', 'portfolio', 'system', 'travel', 'travel_home')`);
+  db.run(`UPDATE menus SET visible = 0 WHERE key = 'travel_home'`);
 
   // Seed menu_type and visible dictionaries
   const menuDicts = [
@@ -380,8 +392,16 @@ async function initDb() {
   seedRoleDataPerms(db, 'system_admin', [
     'users.manage', 'roles.manage', 'menus.manage', 'users.all', 'roles.all', 'menus.all',
   ]);
+  seedRoleDataPerms(db, 'travel_admin', [
+    'trips.read.all', 'trips.write.all', 'budgets.read.all', 'budgets.write.all',
+    'travel_trips.all', 'travel_budget.all',
+  ]);
   seedRoleDataPerms(db, 'reviewer', ['photos.read.all', 'photos.review', 'review.all']);
-  seedRoleDataPerms(db, 'creator', ['photos.read.own', 'photos.write.own']);
+  seedRoleDataPerms(db, 'creator', [
+    'photos.read.own', 'photos.write.own',
+    'trips.read.own', 'trips.write.own', 'budgets.read.own', 'budgets.write.own',
+    'travel_trips.own', 'travel_budget.own',
+  ]);
 
   db.run(`UPDATE dictionaries SET status = 0 WHERE type = 'role' AND value = 'module_admin'`);
   db.run(`UPDATE users SET role = 'photography_admin' WHERE role = 'module_admin'`);
@@ -394,6 +414,186 @@ async function initDb() {
     INSERT OR IGNORE INTO user_roles (user_id, role_id)
     SELECT id, role_id FROM users WHERE role_id IS NOT NULL
   `);
+
+  const travelDicts = [
+    ['trip_status', 'planning', '筹划中', 'default', null, 1],
+    ['trip_status', 'upcoming', '待出发', 'blue', null, 2],
+    ['trip_status', 'ongoing', '进行中', 'orange', null, 3],
+    ['trip_status', 'completed', '已结束', 'green', null, 4],
+    ['trip_status', 'cancelled', '已取消', 'red', null, 5],
+    ['budget_item_status', 'booked', '已订', 'green', null, 1],
+    ['budget_item_status', 'pending', '待购', 'orange', null, 2],
+    ['budget_item_status', 'estimated', '估算', 'default', null, 3],
+    ['expense_category', 'flight', '机票', 'blue', null, 1],
+    ['expense_category', 'lodging', '住宿', 'purple', null, 2],
+    ['expense_category', 'transport', '交通', 'cyan', null, 3],
+    ['expense_category', 'tickets', '门票', 'orange', null, 4],
+    ['expense_category', 'attraction', '景点', 'gold', null, 5],
+    ['expense_category', 'experience', '体验', 'magenta', null, 6],
+    ['expense_category', 'food', '餐饮', 'volcano', null, 7],
+    ['expense_category', 'shopping', '购物', 'geekblue', null, 8],
+    ['expense_category', 'misc', '杂费', 'default', null, 9],
+    ['trip_visibility', 'private', '私密', 'default', null, 1],
+    ['trip_visibility', 'public', '公开', 'green', null, 2],
+    ['currency', 'CNY', '人民币', null, null, 1],
+    ['currency', 'JPY', '日元', null, null, 2],
+    ['currency', 'USD', '美元', null, null, 3],
+    ['currency', 'EUR', '欧元', null, null, 4],
+    ['currency', 'KRW', '韩元', null, null, 5],
+    ['currency', 'HKD', '港币', null, null, 6],
+    ['currency', 'THB', '泰铢', null, null, 7],
+  ];
+  for (const [type, value, label, color, level, sort_order] of travelDicts) {
+    db.run(`INSERT OR IGNORE INTO dictionaries (type, value, label, color, level, sort_order) VALUES (?, ?, ?, ?, ?, ?)`,
+      [type, value, label, color, level, sort_order]);
+  }
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS trips (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      destination TEXT,
+      start_date TEXT,
+      end_date TEXT,
+      status TEXT DEFAULT 'planning',
+      summary TEXT,
+      party_size INTEGER DEFAULT 1,
+      base_currency TEXT DEFAULT 'CNY',
+      trip_currency TEXT DEFAULT 'CNY',
+      fx_rate REAL DEFAULT 1,
+      fx_date TEXT,
+      visibility TEXT DEFAULT 'private',
+      cover_url TEXT,
+      created_by TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS trip_days (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trip_id INTEGER NOT NULL,
+      day_index INTEGER NOT NULL,
+      date TEXT,
+      title TEXT,
+      lodging TEXT,
+      notes TEXT,
+      sort_order INTEGER DEFAULT 0,
+      FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS trip_budget_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trip_id INTEGER NOT NULL,
+      category TEXT,
+      title TEXT NOT NULL,
+      qty REAL DEFAULT 1,
+      unit_amount INTEGER DEFAULT 0,
+      amount INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'pending',
+      optional INTEGER DEFAULT 0,
+      note TEXT,
+      sort_order INTEGER DEFAULT 0,
+      FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS trip_expenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trip_id INTEGER NOT NULL,
+      budget_item_id INTEGER,
+      category TEXT,
+      title TEXT,
+      amount INTEGER DEFAULT 0,
+      spent_on TEXT,
+      note TEXT,
+      created_by TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE,
+      FOREIGN KEY (budget_item_id) REFERENCES trip_budget_items(id) ON DELETE SET NULL
+    )
+  `);
+
+  db.run('CREATE INDEX IF NOT EXISTS idx_trip_days_trip_id ON trip_days(trip_id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_trip_budget_items_trip_id ON trip_budget_items(trip_id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_trip_expenses_trip_id ON trip_expenses(trip_id)');
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS budgets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      trip_id INTEGER,
+      party_size INTEGER DEFAULT 1,
+      base_currency TEXT DEFAULT 'CNY',
+      trip_currency TEXT DEFAULT 'CNY',
+      fx_rate REAL DEFAULT 1,
+      fx_date TEXT,
+      note TEXT,
+      is_main INTEGER DEFAULT 0,
+      created_by TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS budget_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      budget_id INTEGER NOT NULL,
+      category TEXT,
+      title TEXT NOT NULL,
+      qty REAL DEFAULT 1,
+      unit_amount INTEGER DEFAULT 0,
+      amount INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'pending',
+      optional INTEGER DEFAULT 0,
+      note TEXT,
+      sort_order INTEGER DEFAULT 0,
+      FOREIGN KEY (budget_id) REFERENCES budgets(id) ON DELETE CASCADE
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS budget_expenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      budget_id INTEGER NOT NULL,
+      budget_item_id INTEGER,
+      category TEXT,
+      title TEXT,
+      amount INTEGER DEFAULT 0,
+      spent_on TEXT,
+      note TEXT,
+      created_by TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (budget_id) REFERENCES budgets(id) ON DELETE CASCADE,
+      FOREIGN KEY (budget_item_id) REFERENCES budget_items(id) ON DELETE SET NULL
+    )
+  `);
+
+  try {
+    db.run('ALTER TABLE budgets ADD COLUMN is_main INTEGER DEFAULT 0');
+  } catch (e) {}
+
+  const mainRows = sqlAll(db, 'SELECT id FROM budgets WHERE IFNULL(is_main, 0) = 1 ORDER BY id ASC');
+  if (mainRows.length > 1) {
+    db.run('UPDATE budgets SET is_main = 0 WHERE id != ?', [mainRows[0].id]);
+  } else if (mainRows.length === 0) {
+    const firstBudget = sqlOne(db, 'SELECT id FROM budgets ORDER BY id ASC');
+    if (firstBudget) db.run('UPDATE budgets SET is_main = 1 WHERE id = ?', [firstBudget.id]);
+  }
+
+  db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_budgets_trip_id ON budgets(trip_id) WHERE trip_id IS NOT NULL');
+  db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_budgets_is_main ON budgets(is_main) WHERE is_main = 1');
+  db.run('CREATE INDEX IF NOT EXISTS idx_budget_items_budget_id ON budget_items(budget_id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_budget_expenses_budget_id ON budget_expenses(budget_id)');
+
+  migrateLegacyTripBudgets(db);
 
   // Backfill existing users: default avatar by gender, gender='secret' if null
   db.run(`UPDATE users SET gender = 'secret' WHERE gender IS NULL`);
@@ -439,6 +639,106 @@ function closeDb() {
 
 function getDb() {
   return db;
+}
+
+function sqlAll(database, sql, params = []) {
+  const stmt = database.prepare(sql);
+  if (params.length) stmt.bind(params);
+  const rows = [];
+  while (stmt.step()) rows.push(stmt.getAsObject());
+  stmt.free();
+  return rows;
+}
+
+function sqlOne(database, sql, params = []) {
+  return sqlAll(database, sql, params)[0] || null;
+}
+
+function tableExists(database, name) {
+  return !!sqlOne(
+    database,
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+    [name]
+  );
+}
+
+function migrateLegacyTripBudgets(database) {
+  if (!tableExists(database, 'trip_budget_items') || !tableExists(database, 'budgets')) return;
+
+  const trips = sqlAll(database, 'SELECT * FROM trips');
+  for (const trip of trips) {
+    const linked = sqlOne(database, 'SELECT id FROM budgets WHERE trip_id = ?', [trip.id]);
+    if (linked) continue;
+
+    const items = tableExists(database, 'trip_budget_items')
+      ? sqlAll(database, 'SELECT * FROM trip_budget_items WHERE trip_id = ? ORDER BY sort_order ASC, id ASC', [trip.id])
+      : [];
+    const expenses = tableExists(database, 'trip_expenses')
+      ? sqlAll(database, 'SELECT * FROM trip_expenses WHERE trip_id = ? ORDER BY id ASC', [trip.id])
+      : [];
+    if (!items.length && !expenses.length) continue;
+
+    database.run(
+      `INSERT INTO budgets (
+        title, trip_id, party_size, base_currency, trip_currency, fx_rate, fx_date, note, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        trip.title,
+        trip.id,
+        Number(trip.party_size) || 1,
+        trip.base_currency || 'CNY',
+        trip.trip_currency || 'CNY',
+        trip.fx_rate == null ? 1 : trip.fx_rate,
+        trip.fx_date || null,
+        '',
+        trip.created_by || null,
+      ]
+    );
+    const budgetId = sqlOne(database, 'SELECT last_insert_rowid() as id').id;
+    const itemIdMap = {};
+
+    for (const item of items) {
+      database.run(
+        `INSERT INTO budget_items (
+          budget_id, category, title, qty, unit_amount, amount, status, optional, note, sort_order
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          budgetId,
+          item.category || 'misc',
+          item.title,
+          item.qty == null ? 1 : item.qty,
+          item.unit_amount || 0,
+          item.amount || 0,
+          item.status || 'pending',
+          item.optional ? 1 : 0,
+          item.note || '',
+          item.sort_order || 0,
+        ]
+      );
+      itemIdMap[item.id] = sqlOne(database, 'SELECT last_insert_rowid() as id').id;
+    }
+
+    for (const expense of expenses) {
+      const mappedItemId = expense.budget_item_id ? (itemIdMap[expense.budget_item_id] || null) : null;
+      database.run(
+        `INSERT INTO budget_expenses (
+          budget_id, budget_item_id, category, title, amount, spent_on, note, created_by, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          budgetId,
+          mappedItemId,
+          expense.category || '',
+          expense.title || '',
+          expense.amount || 0,
+          expense.spent_on || null,
+          expense.note || '',
+          expense.created_by || null,
+          expense.created_at || null,
+          expense.updated_at || null,
+        ]
+      );
+    }
+  }
 }
 
 module.exports = { initDb, getDb, saveDb, flushDb, closeDb };

@@ -24,6 +24,7 @@ describe('assertAssignableRoles', () => {
 
   it('allows normal roles', () => {
     expect(() => assertAssignableRoles(['photography_admin', 'reviewer'])).not.toThrow();
+    expect(() => assertAssignableRoles(['travel_admin', 'creator'])).not.toThrow();
   });
 
   it('keeps admin on the default super admin', () => {

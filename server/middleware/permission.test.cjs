@@ -10,6 +10,10 @@ const {
   canWritePhoto,
   buildPhotoListFilter,
   visibilitySql,
+  buildTripListFilter,
+  canWriteTrip,
+  buildBudgetListFilter,
+  canWriteBudget,
 } = require('./permission.cjs');
 
 describe('Permission helpers', () => {
@@ -89,20 +93,55 @@ describe('Permission helpers', () => {
       expect(isAdminUser(combined)).toBe(false);
     });
 
-    it('keeps public portfolio on approved photos only', () => {
+    it('keeps public portfolio on approved public photos only', () => {
       expect(buildPhotoListFilter(photoAdmin, { scope: 'all' })).toEqual({
-        sql: 'p.review_status = 1',
+        sql: 'p.review_status = 1 AND IFNULL(p.is_public, 1) = 1',
         params: [],
       });
     });
 
     it('builds adjacent-photo visibility sql', () => {
       expect(visibilitySql(photoAdmin)).toEqual({ sql: '1=1', params: [] });
-      expect(visibilitySql(null)).toEqual({ sql: 'review_status = 1', params: [] });
+      expect(visibilitySql(null)).toEqual({
+        sql: 'review_status = 1 AND IFNULL(is_public, 1) = 1',
+        params: [],
+      });
       expect(visibilitySql({ username: 'niko', permissions: [] })).toEqual({
-        sql: '(review_status = 1 OR uploaded_by = ?)',
+        sql: '((review_status = 1 AND IFNULL(is_public, 1) = 1) OR uploaded_by = ?)',
         params: ['niko'],
       });
+    });
+
+    it('scopes trips to owner unless travel all is granted', () => {
+      const owner = {
+        username: 'niko',
+        permissions: ['trips.read.own', 'trips.write.own'],
+      };
+      const admin = {
+        username: 'travel',
+        permissions: ['trips.read.all', 'trips.write.all'],
+      };
+      expect(buildTripListFilter(owner)).toEqual({ sql: 'created_by = ?', params: ['niko'] });
+      expect(buildTripListFilter(admin).sql).toBe('1=1');
+      expect(canWriteTrip(owner, { created_by: 'niko' })).toBe(true);
+      expect(canWriteTrip(owner, { created_by: 'other' })).toBe(false);
+      expect(canWriteTrip(admin, { created_by: 'other' })).toBe(true);
+    });
+
+    it('scopes budgets independently from trips', () => {
+      const owner = {
+        username: 'niko',
+        permissions: ['budgets.read.own', 'budgets.write.own'],
+      };
+      const admin = {
+        username: 'travel',
+        permissions: ['budgets.read.all', 'budgets.write.all'],
+      };
+      expect(buildBudgetListFilter(owner)).toEqual({ sql: 'created_by = ?', params: ['niko'] });
+      expect(buildBudgetListFilter(admin).sql).toBe('1=1');
+      expect(canWriteBudget(owner, { created_by: 'niko' })).toBe(true);
+      expect(canWriteBudget(owner, { created_by: 'other' })).toBe(false);
+      expect(canWriteBudget(admin, { created_by: 'other' })).toBe(true);
     });
   });
 });

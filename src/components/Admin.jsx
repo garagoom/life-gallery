@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Button, Modal, Form, Input, Select, Upload, Image, Space, Popconfirm, message, Progress, DatePicker, ConfigProvider } from 'antd';
+import { Button, Modal, Form, Input, Select, Upload, Image, Space, Popconfirm, message, Progress, DatePicker, ConfigProvider, Switch } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, FolderOpenOutlined, SearchOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
 import zhCN from 'antd/locale/zh_CN';
 import dayjs from 'dayjs';
-import { getPhotos, uploadPhoto, updatePhoto, deletePhoto, batchDeletePhotos } from '../api/photos';
+import { getPhotos, uploadPhoto, updatePhoto, deletePhoto, batchDeletePhotos, setPhotoVisibility } from '../api/photos';
 import { getThumbnailUrl } from '../data/photos';
 import { cachePhoto } from '../utils/imageCache';
 import { isImageFile } from '../utils/isImageFile';
@@ -51,6 +51,7 @@ export default function Admin() {
   });
   const [searchParams, setSearchParams] = useState({});
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [visibilitySavingId, setVisibilitySavingId] = useState(null);
 
   const loadPhotos = async (page = 1, pageSize = 10, search = {}) => {
     setLoading(true);
@@ -96,6 +97,22 @@ export default function Admin() {
     cachePhoto(record.id, record);
     navigate(`/photography/photo/${record.id}`, { state: { background: location } });
   }, [navigate, location]);
+
+  const handleVisibilityChange = useCallback(async (record, checked) => {
+    const is_public = checked ? 1 : 0;
+    setVisibilitySavingId(record.id);
+    try {
+      await setPhotoVisibility(record.id, is_public);
+      setPhotos((prev) => prev.map((photo) => (
+        photo.id === record.id ? { ...photo, is_public } : photo
+      )));
+      message.success(is_public === 1 ? '已设为公开' : '已设为私密');
+    } catch (error) {
+      message.error(error.message || '更新失败');
+    } finally {
+      setVisibilitySavingId(null);
+    }
+  }, []);
 
   const handleAdd = () => {
     setEditingPhoto(null);
@@ -332,6 +349,22 @@ export default function Admin() {
       },
     },
     {
+      title: '展示',
+      key: 'is_public',
+      width: 108,
+      align: 'center',
+      render: (_, record) => (
+        <Switch
+          size="small"
+          checked={Number(record.is_public) !== 0}
+          loading={visibilitySavingId === record.id}
+          checkedChildren="公开"
+          unCheckedChildren="私密"
+          onChange={(checked) => handleVisibilityChange(record, checked)}
+        />
+      ),
+    },
+    {
       title: '操作',
       key: 'action',
       width: 140,
@@ -447,7 +480,7 @@ export default function Admin() {
               },
             }}
             onChange={handleTableChange}
-            scroll={{ x: 1100, y: 'calc(100vh - 280px)' }}
+            scroll={{ x: 1220, y: 'calc(100vh - 280px)' }}
           />
         </div>
 

@@ -6,3 +6,15 @@
 .table :global(.ant-space) {
   flex-wrap: nowrap;
 }
+
+.table :global(.ant-table-cell-fix-right),
+.table :global(.ant-table-cell-fix-left) {
+  background: var(--bg-secondary) !important;
+}
+
+@media (max-width: 768px) {
+  .table :global(.ant-table-thead > tr > th),
+  .table :global(.ant-table-tbody > tr > td) {
+    white-space: normal;
+  }
+}

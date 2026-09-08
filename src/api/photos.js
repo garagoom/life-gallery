@@ -50,6 +50,14 @@ export async function updatePhoto(id, data) {
   return result.data;
 }
 
+export async function setPhotoVisibility(id, is_public) {
+  const result = await request(`${API_BASE}/photos/${id}/visibility`, {
+    method: 'PUT',
+    body: JSON.stringify({ is_public })
+  });
+  return result.data;
+}
+
 export async function deletePhoto(id) {
   const result = await request(`${API_BASE}/photos/${id}`, {
     method: 'DELETE'

@@ -6,7 +6,7 @@ const sharp = require('sharp');
 const exifReader = require('exif-reader');
 const { getDb, saveDb } = require('../db.cjs');
 const { authMiddleware, optionalAuth } = require('../middleware/auth.cjs');
-const { requireMenu, requireDataPerm, buildPhotoListFilter, canWritePhoto, visibilitySql } = require('../middleware/permission.cjs');
+const { requireMenu, requireDataPerm, buildPhotoListFilter, canWritePhoto, visibilitySql, publicGallerySql } = require('../middleware/permission.cjs');
 const { canViewPhoto } = require('../middleware/media.cjs');
 const { analyzeRgba } = require('../lib/imageAnalysis.cjs');
 const { avifCompanion, encodeAvif } = require('../lib/photoDerivatives.cjs');
@@ -23,7 +23,7 @@ fs.mkdirSync(mediumsDir, { recursive: true });
 
 const LIST_FIELDS = `p.id, p.title, p.filename, p.thumbnail, p.medium, p.date, p.category, p.rotation,
   p.camera_make, p.camera_model, p.exposure_time, p.f_number, p.iso, p.focal_length,
-  p.uploaded_by, p.review_status, p.width, p.height, p.has_avif, p.created_at,
+  p.uploaded_by, p.review_status, p.is_public, p.width, p.height, p.has_avif, p.created_at,
   u.display_name AS uploader_display_name, u.avatar AS uploader_avatar`;
 
 // Configure multer
@@ -377,8 +377,8 @@ function insertPhotoRow(db, photoData, uploadedBy, reviewStatus) {
     `INSERT INTO photos (title, filename, thumbnail, medium, width, height, histogram, palette, has_avif, date, category, rotation,
      camera_make, camera_model, exposure_time, f_number, iso, focal_length,
      software, lens_model, white_balance, metering_mode, exposure_bias, flash, color_space,
-     latitude, longitude, altitude, uploaded_by, review_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     latitude, longitude, altitude, uploaded_by, review_status, is_public)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       photoData.title, photoData.filename, photoData.thumbnail, photoData.medium,
       photoData.width, photoData.height, photoData.histogram, photoData.palette, photoData.hasAvif || 0,
@@ -388,7 +388,7 @@ function insertPhotoRow(db, photoData, uploadedBy, reviewStatus) {
       photoData.software, photoData.lensModel, photoData.whiteBalance,
       photoData.meteringMode, photoData.exposureBias, photoData.flash, photoData.colorSpace,
       photoData.latitude, photoData.longitude, photoData.altitude,
-      uploadedBy, reviewStatus,
+      uploadedBy, reviewStatus, photoData.isPublic == null ? 1 : photoData.isPublic,
     ]
   );
 }
@@ -447,7 +447,7 @@ router.get('/random', (req, res) => {
     const count = parseInt(req.query.count) || 20;
     
     // Get total count
-    const countStmt = db.prepare('SELECT COUNT(*) as total FROM photos');
+    const countStmt = db.prepare(`SELECT COUNT(*) as total FROM photos WHERE ${publicGallerySql()}`);
     countStmt.step();
     const total = countStmt.getAsObject().total;
     countStmt.free();
@@ -456,7 +456,7 @@ router.get('/random', (req, res) => {
       return paginate(res, [], { total: 0, count: 0 });
     }
 
-    const idStmt = db.prepare('SELECT id FROM photos WHERE review_status = 1');
+    const idStmt = db.prepare(`SELECT id FROM photos WHERE ${publicGallerySql()}`);
     const ids = [];
     while (idStmt.step()) {
       ids.push(idStmt.getAsObject().id);
@@ -834,6 +834,53 @@ router.put('/:id', authMiddleware, requireMenu('admin'), (req, res) => {
     success(res, photo, '更新成功');
   } catch (err) {
     console.error('Update error:', err);
+    error(res, '更新失败: ' + err.message);
+  }
+});
+
+function parsePublicFlag(value) {
+  if (value === true || value === 1 || value === '1') return 1;
+  if (value === false || value === 0 || value === '0') return 0;
+  return null;
+}
+
+// PUT /api/photos/:id/visibility
+router.put('/:id/visibility', authMiddleware, requireMenu('admin'), (req, res) => {
+  try {
+    const isPublic = parsePublicFlag(req.body?.is_public);
+    if (isPublic !== 0 && isPublic !== 1) {
+      return error(res, '请指定公开或私密', 400);
+    }
+
+    const db = getDb();
+    const photoId = parseInt(req.params.id);
+    const checkStmt = db.prepare('SELECT * FROM photos WHERE id = ?');
+    checkStmt.bind([photoId]);
+
+    if (!checkStmt.step()) {
+      checkStmt.free();
+      return error(res, '照片不存在', 404);
+    }
+
+    const existing = checkStmt.getAsObject();
+    checkStmt.free();
+
+    if (!canWritePhoto(req.user, existing)) {
+      return error(res, '无权修改此照片', 403);
+    }
+
+    db.run('UPDATE photos SET is_public = ? WHERE id = ?', [isPublic, photoId]);
+    saveDb();
+
+    const stmt = db.prepare('SELECT * FROM photos WHERE id = ?');
+    stmt.bind([photoId]);
+    stmt.step();
+    const photo = stmt.getAsObject();
+    stmt.free();
+
+    success(res, photo, isPublic === 1 ? '已设为公开' : '已设为私密');
+  } catch (err) {
+    console.error('Update visibility error:', err);
     error(res, '更新失败: ' + err.message);
   }
 });

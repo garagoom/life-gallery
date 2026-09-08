@@ -6,6 +6,9 @@ export default defineConfig({
   resolve: {
     dedupe: ['react', 'react-dom'],
   },
+  optimizeDeps: {
+    include: ['exceljs'],
+  },
   server: {
     port: 5173,
     strictPort: true,
@@ -42,7 +45,12 @@ export default defineConfig({
     globals: true,
     environment: 'happy-dom',
     setupFiles: ['./src/test/setup.js'],
-    include: ['src/**/*.{test,spec}.{js,jsx}'],
+    include: [
+      'src/**/*.{test,spec}.{js,jsx}',
+      'server/lib/geoCatalog.test.cjs',
+      'server/lib/geoLookup.test.cjs',
+      'server/lib/fxCatalog.test.cjs',
+    ],
     css: { modules: { classNameStrategy: 'non-scoped' } },
     pool: 'threads',
   },

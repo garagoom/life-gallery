@@ -1,0 +1,376 @@
+.container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 20px;
+  width: 100%;
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 80px;
+}
+
+.searchBar {
+  background: var(--bg-secondary);
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+.tableWrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tableWrap :global(.ant-pagination) {
+  padding-right: 72px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.sub {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.section {
+  background: var(--bg-secondary);
+  border-radius: 10px;
+  padding: 16px;
+  flex-shrink: 0;
+}
+
+.sectionHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  flex-shrink: 0;
+  margin-bottom: 16px;
+}
+
+.stat {
+  background: var(--bg-primary, transparent);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.statLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.statValue {
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.over {
+  color: #ff4d4f;
+}
+
+.statHint {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.categoryRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.categoryName {
+  width: 64px;
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.tableActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.preview :global(.ant-input[readonly]),
+.preview :global(textarea.ant-input[readonly]),
+.preview :global(.ant-input-number-readonly),
+.preview :global(.ant-input-number-readonly .ant-input-number-input),
+.preview :global(.ant-select-disabled .ant-select-selector),
+.preview :global(.ant-picker-disabled) {
+  cursor: default;
+  color: inherit;
+  background: transparent !important;
+  box-shadow: none;
+}
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+}
+
+.card {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 14px;
+  cursor: pointer;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.cardMeta {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.cardMoney {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.cardMoneyItem {
+  min-width: 0;
+}
+
+.cardMoneyLabel {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.cardMoneyValue {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.cardActions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.itemCard,
+.dayCard {
+  background: var(--bg-primary, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-secondary) 16%, transparent);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cardHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 8px;
+}
+
+.fullField {
+  grid-column: 1 / -1;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.mobilePager {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 4px;
+  flex-shrink: 0;
+}
+
+.formStack :global(.ant-space) {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .container {
+    height: 100dvh;
+    padding: 12px 12px calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .headerActions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .title {
+    font-size: 20px;
+  }
+
+  .sub {
+    font-size: 12px;
+  }
+
+  .searchBar {
+    padding: 12px;
+  }
+
+  .searchBar :global(.ant-form-inline) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .searchBar :global(.ant-form-item) {
+    width: 100%;
+    margin-inline-end: 0 !important;
+  }
+
+  .searchBar :global(.ant-form-item-control-input),
+  .searchBar :global(.ant-input),
+  .searchBar :global(.ant-select),
+  .searchBar :global(.ant-picker) {
+    width: 100% !important;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .stat {
+    padding: 10px 12px;
+  }
+
+  .statValue {
+    font-size: 16px;
+  }
+
+  .section {
+    padding: 12px;
+  }
+
+  .sectionHead {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .formStack :global(.ant-form-item) {
+    width: 100%;
+  }
+
+  .formStack :global(.ant-input-number),
+  .formStack :global(.ant-picker),
+  .formStack :global(.ant-select) {
+    width: 100% !important;
+  }
+
+  .categoryName {
+    width: 48px;
+    font-size: 12px;
+  }
+
+  .scroll {
+    padding-bottom: 24px;
+  }
+
+  .listPage.container {
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .listPage .cardList {
+    flex: none;
+    overflow: visible;
+    min-height: 0;
+  }
+
+  .listPage :global(.ant-spin-nested-loading),
+  .listPage :global(.ant-spin-container) {
+    min-height: 0;
+  }
+}
