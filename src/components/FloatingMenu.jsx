@@ -89,7 +89,7 @@ function resolveMenuTree(apiTree) {
 export default function FloatingMenu() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, loginUser } = useAuth();
+  const { user, logoutUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === 'dark';
   const [loggingOut, setLoggingOut] = useState(false);
@@ -138,12 +138,19 @@ export default function FloatingMenu() {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
-    getMyMenus().then(res => {
+    if (!user?.id) {
+      setModules(fallbackModules);
+      return undefined;
+    }
+    let cancelled = false;
+    setModules(fallbackModules);
+    getMyMenus().then((res) => {
+      if (cancelled) return;
       const tree = resolveMenuTree(res.data || []);
       if (tree.length > 0) setModules(tree);
     }).catch(() => {});
-  }, [user]);
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   const handlePointerDown = (event) => {
     if (event.button !== undefined && event.button !== 0) return;
@@ -258,7 +265,7 @@ export default function FloatingMenu() {
     try {
       await logout();
     } catch {}
-    loginUser(null);
+    logoutUser();
   };
 
   const moduleMenuItems = modules.map(mod => ({

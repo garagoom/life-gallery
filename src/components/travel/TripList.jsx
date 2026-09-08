@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Button, Modal, Form, Input, InputNumber, Select, Space, Popconfirm, message, DatePicker, ConfigProvider, Pagination, Spin,
 } from 'antd';
@@ -15,6 +15,7 @@ import styles from './travel.module.css';
 
 export default function TripList() {
   const navigate = useNavigate();
+  const location = useLocation();
   const mobile = useIsMobile();
   const { getDict, getLabel, getColor } = useDict();
   const [trips, setTrips] = useState([]);
@@ -26,23 +27,36 @@ export default function TripList() {
   const [deletingId, setDeletingId] = useState(null);
   const [searchParams, setSearchParams] = useState({});
   const [pagination, setPagination] = useState({ page: 1, pageSize: 10, total: 0 });
+  const paginationRef = useRef(pagination);
+  const searchRef = useRef(searchParams);
+  paginationRef.current = pagination;
+  searchRef.current = searchParams;
 
-  const loadTrips = async (page = 1, pageSize = 10, search = {}) => {
+  const loadTrips = useCallback(async (page = 1, pageSize = 10, search = {}) => {
     setLoading(true);
     try {
       const result = await getTrips({ page, pageSize, ...search });
       setTrips(result.data || []);
-      setPagination(result.pagination);
+      setPagination(result.pagination || { page, pageSize, total: 0, totalPages: 0 });
     } catch (error) {
       message.error(error.message || '加载出游计划失败');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const reloadTrips = useCallback((page, pageSize, search) => {
+    const pager = paginationRef.current;
+    return loadTrips(
+      page ?? pager.page,
+      pageSize ?? pager.pageSize,
+      search ?? searchRef.current,
+    );
+  }, [loadTrips]);
 
   useEffect(() => {
-    loadTrips();
-  }, []);
+    reloadTrips();
+  }, [location.key, reloadTrips]);
 
   const handleSearch = (values) => {
     const params = {};
@@ -80,6 +94,7 @@ export default function TripList() {
       });
       message.success('创建成功');
       setModalOpen(false);
+      await reloadTrips(1);
       navigate(`/travel/trips/${created.id}?mode=edit`);
     } catch (error) {
       if (error.errorFields) return;
@@ -94,7 +109,11 @@ export default function TripList() {
     try {
       await deleteTrip(id);
       message.success('删除成功');
-      loadTrips(pagination.page, pagination.pageSize, searchParams);
+      const pager = paginationRef.current;
+      const remaining = trips.filter((trip) => trip.id !== id);
+      setTrips(remaining);
+      const nextPage = remaining.length === 0 && pager.page > 1 ? pager.page - 1 : pager.page;
+      await reloadTrips(nextPage);
     } catch (error) {
       message.error(error.message || '删除失败');
     } finally {
@@ -168,7 +187,7 @@ export default function TripList() {
             <TravelFileActions
               mode="import"
               onImported={(data) => {
-                loadTrips(pagination.page, pagination.pageSize, searchParams);
+                reloadTrips();
                 navigate(`/travel/trips/${data.id}`);
               }}
             />
@@ -244,6 +263,7 @@ export default function TripList() {
         ) : (
           <div className={styles.tableWrap}>
             <ListTable
+              key={trips.map((trip) => `${trip.id}:${trip.updated_at || ''}`).join('|')}
               columns={columns}
               dataSource={trips}
               loading={loading}

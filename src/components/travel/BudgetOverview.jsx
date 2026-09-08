@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Button, Form, Input, Select, DatePicker, Space, Switch, message, ConfigProvider, Popconfirm, Pagination, Spin,
 } from 'antd';
@@ -16,6 +16,7 @@ import styles from './travel.module.css';
 
 export default function BudgetOverview() {
   const navigate = useNavigate();
+  const location = useLocation();
   const mobile = useIsMobile();
   const { getDict, getLabel, getColor } = useDict();
   const [form] = Form.useForm();
@@ -24,26 +25,37 @@ export default function BudgetOverview() {
   const [includeOptional, setIncludeOptional] = useState(false);
   const [filters, setFilters] = useState({});
   const [deletingId, setDeletingId] = useState(null);
+  const dataRef = useRef(data);
+  const filtersRef = useRef(filters);
+  const optionalRef = useRef(includeOptional);
+  dataRef.current = data;
+  filtersRef.current = filters;
+  optionalRef.current = includeOptional;
 
-  const load = async (page = 1, pageSize = 10, params = filters, optional = includeOptional) => {
+  const load = useCallback(async (page = 1, pageSize = 10, params = filtersRef.current, optional = optionalRef.current) => {
     setLoading(true);
     try {
       const result = await getBudgets({ page, pageSize, ...params, include_optional: optional ? 1 : 0 });
       setData({
         totals: result.totals || {},
         data: result.data || [],
-        pagination: result.pagination,
+        pagination: result.pagination || { page, pageSize, total: 0 },
       });
     } catch (error) {
       message.error(error.message || '加载预算失败');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const reload = useCallback((page, pageSize) => {
+    const pager = dataRef.current.pagination;
+    return load(page ?? pager.page, pageSize ?? pager.pageSize, filtersRef.current, optionalRef.current);
+  }, [load]);
 
   useEffect(() => {
-    load();
-  }, []);
+    reload();
+  }, [location.key, reload]);
 
   const handleSearch = (values) => {
     const params = {};
@@ -59,7 +71,7 @@ export default function BudgetOverview() {
     try {
       await setBudgetMain(record.id, checked);
       message.success(checked ? '已设为主线' : '已取消主线');
-      load(data.pagination.page, data.pagination.pageSize);
+      await reload();
     } catch (error) {
       message.error(error.message || '设置主线失败');
     }
@@ -70,7 +82,11 @@ export default function BudgetOverview() {
     try {
       await deleteBudget(id);
       message.success('删除成功');
-      load(data.pagination.page, data.pagination.pageSize);
+      const pager = dataRef.current.pagination;
+      const remaining = (dataRef.current.data || []).filter((row) => row.id !== id);
+      setData((prev) => ({ ...prev, data: remaining }));
+      const nextPage = remaining.length === 0 && pager.page > 1 ? pager.page - 1 : pager.page;
+      await reload(nextPage);
     } catch (error) {
       message.error(error.message || '删除失败');
     } finally {
@@ -308,6 +324,7 @@ export default function BudgetOverview() {
           ) : (
           <div className={styles.tableWrap}>
             <ListTable
+              key={(data.data || []).map((row) => `${row.id}:${row.updated_at || ''}`).join('|')}
               columns={columns}
               dataSource={data.data || []}
               loading={loading}

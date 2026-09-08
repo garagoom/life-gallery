@@ -151,6 +151,7 @@ server/keys/
 database.sqlite
 database.sqlite-wal
 database.sqlite-shm
+tmp-*.json
 
 # Environment files
 .env

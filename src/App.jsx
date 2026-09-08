@@ -7,6 +7,7 @@ import RetroLightbox from './components/RetroLightbox';
 import Loading from './components/Loading';
 import Login from './components/Login';
 import ProtectedRoute from './components/ProtectedRoute';
+import { useAuth } from './contexts/AuthContext';
 import { fallbackPhotos } from './data/photos';
 
 const Portfolio = lazy(() => import('./components/Portfolio'));
@@ -39,9 +40,11 @@ function RouteFallback() {
 }
 
 function FloatingMenuWrapper() {
+  const { user } = useAuth();
   const { pathname } = useLocation();
   if (hideMenuPaths.some(p => pathname.startsWith(p))) return null;
-  return <FloatingMenu />;
+  if (!user) return null;
+  return <FloatingMenu key={user.id} />;
 }
 
 function AppRoutes({ handlePhotosLoaded, handlePhotoClick, isPaused, photos }) {

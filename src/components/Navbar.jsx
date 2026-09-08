@@ -7,7 +7,7 @@ import styles from './Navbar.module.css';
 
 export default function Navbar() {
   const navigate = useNavigate();
-  const { user, loginUser, can } = useAuth();
+  const { user, logoutUser, can } = useAuth();
 
   const userMenuItems = [
     {
@@ -28,7 +28,7 @@ export default function Navbar() {
       icon: <LogoutOutlined />,
       onClick: () => {
         logout();
-        loginUser(null);
+        logoutUser();
       },
     },
   ].filter(Boolean);

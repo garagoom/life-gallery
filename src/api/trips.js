@@ -11,7 +11,7 @@ function withQuery(url, params = {}) {
 }
 
 export async function getTrips(params = {}) {
-  const result = await request(withQuery(`${API_BASE}/trips`, params));
+  const result = await request(withQuery(`${API_BASE}/trips`, { ...params, _: Date.now() }));
   return {
     data: result.data || [],
     pagination: result.pagination || { page: 1, pageSize: 10, total: 0, totalPages: 0 },
