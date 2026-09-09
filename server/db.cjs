@@ -270,6 +270,7 @@ async function initDb() {
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (1, NULL, 'photography', '摄影', 'CameraOutlined', '/photography', 1)`);
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (2, 1, 'home', '首页', 'HomeOutlined', '/photography/home', 1)`);
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (3, 1, 'portfolio', '作品集', 'PictureOutlined', '/photography/portfolio', 2)`);
+  db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (14, 1, 'calendar', '照片日历', 'CalendarOutlined', '/photography/calendar', 3)`);
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (4, 1, 'admin', '照片管理', 'SettingOutlined', '/photography/admin', 3)`);
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (9, 1, 'review', '审核管理', 'SafetyOutlined', '/photography/admin/review', 4)`);
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (5, NULL, 'system', '系统管理', 'AppstoreOutlined', '/system', 10)`);
@@ -283,12 +284,12 @@ async function initDb() {
 
   // Assign default permissions
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'admin'`);
-  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'photography_admin' AND m.id IN (1, 2, 3, 4, 9)`);
+  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'photography_admin' AND m.id IN (1, 2, 3, 4, 9, 14)`);
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'system_admin' AND m.id IN (5, 6, 7, 8)`);
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'travel_admin' AND m.key IN ('travel', 'travel_trips', 'travel_budget', 'travel_home')`);
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'reviewer' AND m.id IN (1, 9)`);
-  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'creator' AND m.key IN ('photography', 'home', 'portfolio', 'travel', 'travel_trips', 'travel_budget')`);
-  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'viewer' AND m.id IN (1, 2, 3)`);
+  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'creator' AND m.key IN ('photography', 'home', 'portfolio', 'calendar', 'travel', 'travel_trips', 'travel_budget')`);
+  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'viewer' AND m.id IN (1, 2, 3, 14)`);
 
   // Create dictionaries table
   db.run(`
@@ -348,7 +349,7 @@ async function initDb() {
   db.run(`UPDATE menus SET type = 'module' WHERE parent_id IS NULL AND type = 'menu'`);
   db.run(`UPDATE menus SET type = 'button' WHERE key IN ('admin', 'review') AND type = 'menu'`);
   db.run(`UPDATE menus SET type = 'menu' WHERE parent_id IS NOT NULL AND key NOT IN ('admin', 'review') AND type = 'menu'`);
-  db.run(`UPDATE menus SET has_data_scope = 1 WHERE key IN ('admin', 'review', 'users', 'roles', 'menus', 'travel_trips', 'travel_budget')`);
+  db.run(`UPDATE menus SET has_data_scope = 1 WHERE key IN ('admin', 'review', 'users', 'roles', 'menus', 'travel_trips', 'travel_budget', 'calendar')`);
   db.run(`UPDATE menus SET has_data_scope = 0 WHERE key IN ('photography', 'home', 'portfolio', 'system', 'travel', 'travel_home')`);
   db.run(`UPDATE menus SET visible = 0 WHERE key = 'travel_home'`);
 
@@ -387,7 +388,7 @@ async function initDb() {
   `);
 
   seedRoleDataPerms(db, 'photography_admin', [
-    'photos.read.all', 'photos.write.all', 'photos.review', 'admin.all', 'review.all',
+    'photos.read.all', 'photos.write.all', 'photos.review', 'admin.all', 'review.all', 'calendar.all',
   ]);
   seedRoleDataPerms(db, 'system_admin', [
     'users.manage', 'roles.manage', 'menus.manage', 'users.all', 'roles.all', 'menus.all',
@@ -399,6 +400,7 @@ async function initDb() {
   seedRoleDataPerms(db, 'reviewer', ['photos.read.all', 'photos.review', 'review.all']);
   seedRoleDataPerms(db, 'creator', [
     'photos.read.own', 'photos.write.own',
+    'calendar.own',
     'trips.read.own', 'trips.write.own', 'budgets.read.own', 'budgets.write.own',
     'travel_trips.own', 'travel_budget.own',
   ]);

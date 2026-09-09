@@ -154,6 +154,11 @@ export function composeDataPermissions({
     if (all.has(REVIEW_KEY)) codes.add('photos.read.all');
   }
 
+  if (keys.has('calendar') && withScope('calendar')) {
+    if (all.has('calendar')) codes.add('photos.read.all');
+    else codes.add('photos.read.own');
+  }
+
   if (keys.has('users') && all.has('users')) codes.add('users.manage');
   if (keys.has('roles') && all.has('roles')) codes.add('roles.manage');
   if (keys.has('menus') && all.has('menus')) codes.add('menus.manage');

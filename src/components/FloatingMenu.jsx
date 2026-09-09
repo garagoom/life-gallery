@@ -41,6 +41,7 @@ const fallbackModules = [
     children: [
       { key: 'home', label: '首页', path: '/photography/home', icon: <HomeOutlined /> },
       { key: 'portfolio', label: '作品集', path: '/photography/portfolio', icon: <PictureOutlined /> },
+      { key: 'calendar', label: '照片日历', path: '/photography/calendar', icon: <CalendarOutlined /> },
       { key: 'admin', label: '管理', path: '/photography/admin', icon: <SettingOutlined /> },
     ]
   },

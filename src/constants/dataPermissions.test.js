@@ -105,6 +105,23 @@ describe('dataPermissions', () => {
     expect(all).not.toContain('budgets.read.all');
   });
 
+  it('maps calendar menu to photo read own/all', () => {
+    const own = composeDataPermissions({
+      menuKeys: ['calendar'],
+      allScopeKeys: [],
+      scopedKeys: ['calendar'],
+    });
+    expect(own).toEqual(expect.arrayContaining(['calendar.own', 'photos.read.own']));
+    expect(own).not.toContain('photos.read.all');
+
+    const all = composeDataPermissions({
+      menuKeys: ['calendar'],
+      allScopeKeys: ['calendar'],
+      scopedKeys: ['calendar'],
+    });
+    expect(all).toEqual(expect.arrayContaining(['calendar.all', 'photos.read.all']));
+  });
+
   it('infers 全站 keys from stored codes', () => {
     expect(inferAllScopeKeys(['admin.all', 'photos.write.all', 'users.manage'])).toEqual(
       expect.arrayContaining(['admin', 'users'])

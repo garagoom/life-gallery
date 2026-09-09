@@ -23,6 +23,8 @@ const TripList = lazy(() => import('./components/travel/TripList'));
 const TripDetail = lazy(() => import('./components/travel/TripDetail'));
 const BudgetOverview = lazy(() => import('./components/travel/BudgetOverview'));
 const BudgetDetail = lazy(() => import('./components/travel/BudgetDetail'));
+const PhotoCalendar = lazy(() => import('./components/PhotoCalendar'));
+const PhotoCalendarDay = lazy(() => import('./components/PhotoCalendarDay'));
 
 const hideMenuPaths = ['/login', '/register', '/loading'];
 
@@ -72,6 +74,16 @@ function AppRoutes({ handlePhotosLoaded, handlePhotoClick, isPaused, photos }) {
             <div style={{ height: '100%', overflow: 'auto', paddingBottom: '80px' }}>
               <Portfolio />
             </div>
+          </ProtectedRoute>
+        } />
+        <Route path="/photography/calendar" element={
+          <ProtectedRoute>
+            <PhotoCalendar />
+          </ProtectedRoute>
+        } />
+        <Route path="/photography/calendar/:date" element={
+          <ProtectedRoute>
+            <PhotoCalendarDay />
           </ProtectedRoute>
         } />
         <Route path="/photography/photo/:id" element={

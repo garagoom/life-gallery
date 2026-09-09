@@ -34,6 +34,8 @@ const DATA_PERM_CODES = [
 const MENU_SCOPE_ALIASES = {
   'admin.all': ['photos.read.all', 'photos.write.all'],
   'admin.own': ['photos.read.own', 'photos.write.own'],
+  'calendar.all': ['photos.read.all'],
+  'calendar.own': ['photos.read.own'],
   'review.all': ['photos.read.all', 'photos.review'],
   'review.own': ['photos.review'],
   'users.all': ['users.manage'],
