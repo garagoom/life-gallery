@@ -63,6 +63,14 @@ function normalizeBudgetStatus(value, fallback = 'pending') {
   return BUDGET_STATUSES.has(status) ? status : fallback;
 }
 
+function markLinkedBudgetItemBooked(db, budgetId, budgetItemId) {
+  if (!budgetItemId) return;
+  db.run(
+    `UPDATE budget_items SET status = 'booked' WHERE id = ? AND budget_id = ?`,
+    [budgetItemId, budgetId]
+  );
+}
+
 function normalizeFxRate(tripCurrency, baseCurrency, fxRate) {
   if (tripCurrency === baseCurrency) return 1;
   const rate = Number(fxRate);
@@ -547,6 +555,7 @@ router.post('/:id/expenses', authMiddleware, requireMenu('travel_budget'), (req,
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [budget.id, budgetItemId, category, title, amountMinor, spentOn, note, req.user.username]
     );
+    markLinkedBudgetItemBooked(db, budget.id, budgetItemId);
     saveDb();
     success(res, presentBudgetDetail(getBudget(db, budget.id)), '记账成功', 201);
   } catch (err) {
@@ -594,6 +603,7 @@ router.put('/:id/expenses/:eid', authMiddleware, requireMenu('travel_budget'), (
        WHERE id = ? AND budget_id = ?`,
       [budgetItemId, category, title, amountMinor, spentOn, note, expense.id, budget.id]
     );
+    markLinkedBudgetItemBooked(db, budget.id, budgetItemId);
     saveDb();
     success(res, presentBudgetDetail(getBudget(db, budget.id)), '记账已更新');
   } catch (err) {
