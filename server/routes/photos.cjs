@@ -23,8 +23,13 @@ fs.mkdirSync(mediumsDir, { recursive: true });
 
 const LIST_FIELDS = `p.id, p.title, p.filename, p.thumbnail, p.medium, p.date, p.category, p.rotation,
   p.camera_make, p.camera_model, p.exposure_time, p.f_number, p.iso, p.focal_length,
-  p.uploaded_by, p.review_status, p.is_public, p.width, p.height, p.has_avif, p.created_at,
-  u.display_name AS uploader_display_name, u.avatar AS uploader_avatar`;
+  p.uploaded_by, p.review_status, p.reviewed_by, p.reviewed_at, p.is_public, p.width, p.height, p.has_avif, p.created_at,
+  u.display_name AS uploader_display_name, u.avatar AS uploader_avatar,
+  r.display_name AS reviewer_display_name`;
+
+const LIST_JOINS = `FROM photos p
+       LEFT JOIN users u ON p.uploaded_by = u.username
+       LEFT JOIN users r ON p.reviewed_by = r.username`;
 
 // Configure multer
 const storage = multer.diskStorage({
@@ -373,12 +378,15 @@ async function processPhoto(file, title, date, category) {
 }
 
 function insertPhotoRow(db, photoData, uploadedBy, reviewStatus) {
+  const autoApproved = reviewStatus === 1;
+  const reviewedBy = autoApproved ? uploadedBy : null;
+  const reviewedAt = autoApproved ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null;
   db.run(
     `INSERT INTO photos (title, filename, thumbnail, medium, width, height, histogram, palette, has_avif, date, category, rotation,
      camera_make, camera_model, exposure_time, f_number, iso, focal_length,
      software, lens_model, white_balance, metering_mode, exposure_bias, flash, color_space,
-     latitude, longitude, altitude, uploaded_by, review_status, is_public)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     latitude, longitude, altitude, uploaded_by, review_status, reviewed_by, reviewed_at, is_public)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       photoData.title, photoData.filename, photoData.thumbnail, photoData.medium,
       photoData.width, photoData.height, photoData.histogram, photoData.palette, photoData.hasAvif || 0,
@@ -388,7 +396,7 @@ function insertPhotoRow(db, photoData, uploadedBy, reviewStatus) {
       photoData.software, photoData.lensModel, photoData.whiteBalance,
       photoData.meteringMode, photoData.exposureBias, photoData.flash, photoData.colorSpace,
       photoData.latitude, photoData.longitude, photoData.altitude,
-      uploadedBy, reviewStatus, photoData.isPublic == null ? 1 : photoData.isPublic,
+      uploadedBy, reviewStatus, reviewedBy, reviewedAt, photoData.isPublic == null ? 1 : photoData.isPublic,
     ]
   );
 }
@@ -478,8 +486,7 @@ router.get('/random', (req, res) => {
     const placeholders = picked.map(() => '?').join(',');
     const stmt = db.prepare(`
       SELECT ${LIST_FIELDS}
-      FROM photos p
-      LEFT JOIN users u ON p.uploaded_by = u.username
+      ${LIST_JOINS}
       WHERE p.id IN (${placeholders})
     `);
     stmt.bind(picked);
@@ -543,8 +550,7 @@ router.get('/', authMiddleware, (req, res) => {
     const offset = (parseInt(page) - 1) * parseInt(pageSize);
     const dataStmt = db.prepare(
       `SELECT ${LIST_FIELDS}
-       FROM photos p
-       LEFT JOIN users u ON p.uploaded_by = u.username
+       ${LIST_JOINS}
        ${whereClause} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`
     );
     dataStmt.bind([...params, parseInt(pageSize), offset]);
@@ -629,8 +635,7 @@ router.get('/review', authMiddleware, requireMenu('review'), requireDataPerm('ph
     const offset = (parseInt(page) - 1) * parseInt(pageSize);
     const dataStmt = db.prepare(
       `SELECT ${LIST_FIELDS}
-       FROM photos p
-       LEFT JOIN users u ON p.uploaded_by = u.username
+       ${LIST_JOINS}
        ${whereClause} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`
     );
     dataStmt.bind([...params, parseInt(pageSize), offset]);
@@ -660,12 +665,20 @@ router.post('/batch-review', authMiddleware, requireMenu('review'), requireDataP
     }
 
     const db = getDb();
+    const reviewedBy = req.user.username;
     for (const id of ids) {
-      db.run('UPDATE photos SET review_status = ? WHERE id = ?', [review_status, parseInt(id)]);
+      db.run(
+        'UPDATE photos SET review_status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [review_status, reviewedBy, parseInt(id)]
+      );
     }
     saveDb();
 
-    success(res, { count: ids.length }, review_status === 1 ? `已通过 ${ids.length} 张照片` : `已拒绝 ${ids.length} 张照片`);
+    success(
+      res,
+      { count: ids.length },
+      review_status === 1 ? `审核通过 ${ids.length} 张照片` : `审核失败 ${ids.length} 张照片`
+    );
   } catch (err) {
     console.error('Batch review error:', err);
     error(res, '批量审核失败');
@@ -678,9 +691,11 @@ router.get('/:id', optionalAuth, (req, res) => {
     const db = getDb();
     const photoId = parseInt(req.params.id);
     const stmt = db.prepare(`
-      SELECT p.*, u.display_name AS uploader_display_name, u.avatar AS uploader_avatar, u.bio AS uploader_bio
+      SELECT p.*, u.display_name AS uploader_display_name, u.avatar AS uploader_avatar, u.bio AS uploader_bio,
+        r.display_name AS reviewer_display_name
       FROM photos p
       LEFT JOIN users u ON p.uploaded_by = u.username
+      LEFT JOIN users r ON p.reviewed_by = r.username
       WHERE p.id = ?
     `);
     stmt.bind([photoId]);
@@ -934,10 +949,13 @@ router.put('/:id/review', authMiddleware, requireMenu('review'), (req, res) => {
     }
     checkStmt.free();
 
-    db.run('UPDATE photos SET review_status = ? WHERE id = ?', [review_status, parseInt(req.params.id)]);
+    db.run(
+      'UPDATE photos SET review_status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [review_status, req.user.username, parseInt(req.params.id)]
+    );
     saveDb();
 
-    success(res, null, review_status === 1 ? '已通过审核' : '已拒绝');
+    success(res, null, review_status === 1 ? '审核通过' : '审核失败');
   } catch (err) {
     console.error('Review error:', err);
     error(res, '审核操作失败');

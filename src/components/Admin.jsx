@@ -368,9 +368,9 @@ export default function Admin() {
       render: (_, record) => settingsText(record) || '-',
     },
     {
-      title: '审核',
+      title: '审核状态',
       key: 'review_status',
-      width: 88,
+      width: 100,
       render: (_, record) => (
         <span style={{ color: reviewColor(record), fontWeight: 500 }}>{getLabel('review_status', record.review_status)}</span>
       ),

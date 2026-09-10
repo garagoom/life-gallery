@@ -59,7 +59,7 @@ export default function ReviewManage() {
   const handleReview = async (id, review_status) => {
     try {
       await reviewPhoto(id, review_status);
-      message.success(review_status === 1 ? '已通过' : '已拒绝');
+      message.success(review_status === 1 ? '审核通过' : '审核失败');
       loadPhotos(pagination.page, pagination.pageSize, statusFilter);
     } catch (err) {
       message.error(err.message || '操作失败');
@@ -71,7 +71,7 @@ export default function ReviewManage() {
     setBatchLoading(true);
     try {
       await batchReviewPhotos(selectedRowKeys, review_status);
-      message.success(review_status === 1 ? `已通过 ${selectedRowKeys.length} 张` : `已拒绝 ${selectedRowKeys.length} 张`);
+      message.success(review_status === 1 ? `审核通过 ${selectedRowKeys.length} 张` : `审核失败 ${selectedRowKeys.length} 张`);
       setSelectedRowKeys([]);
       loadPhotos(pagination.page, pagination.pageSize, statusFilter);
     } catch (err) {
@@ -90,17 +90,23 @@ export default function ReviewManage() {
     <Space size="small">
       <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleView(record)} />
       {record.review_status !== 1 && (
-        <Popconfirm title="通过审核？" onConfirm={() => handleReview(record.id, 1)} okText="确定" cancelText="取消">
+        <Popconfirm title="确认审核通过？" onConfirm={() => handleReview(record.id, 1)} okText="确定" cancelText="取消">
           <Button type="link" size="small" icon={<CheckOutlined style={{ color: '#52c41a' }} />} />
         </Popconfirm>
       )}
       {record.review_status !== 2 && (
-        <Popconfirm title="拒绝？" onConfirm={() => handleReview(record.id, 2)} okText="确定" cancelText="取消">
+        <Popconfirm title="确认审核失败？" onConfirm={() => handleReview(record.id, 2)} okText="确定" cancelText="取消">
           <Button type="link" size="small" danger icon={<CloseOutlined />} />
         </Popconfirm>
       )}
     </Space>
   );
+
+  const formatReviewedAt = (value) => {
+    if (!value) return '-';
+    const text = String(value).replace('T', ' ');
+    return text.length > 16 ? text.slice(0, 16) : text;
+  };
 
   const columns = [
     {
@@ -126,7 +132,7 @@ export default function ReviewManage() {
     {
       title: '上传者',
       key: 'uploader',
-      width: 180,
+      width: 160,
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {record.uploader_avatar ? (
@@ -141,14 +147,28 @@ export default function ReviewManage() {
       ),
     },
     {
-      title: '状态',
+      title: '审核状态',
       dataIndex: 'review_status',
       key: 'review_status',
-      width: 88,
+      width: 100,
       align: 'center',
       render: (val) => {
         return <Tag color={getColor('review_status', val)}>{getLabel('review_status', val)}</Tag>;
       },
+    },
+    {
+      title: '审核人',
+      key: 'reviewed_by',
+      width: 120,
+      ellipsis: true,
+      render: (_, record) => record.reviewer_display_name || record.reviewed_by || '-',
+    },
+    {
+      title: '审核时间',
+      dataIndex: 'reviewed_at',
+      key: 'reviewed_at',
+      width: 150,
+      render: (val) => formatReviewedAt(val),
     },
     {
       title: '操作',
@@ -160,14 +180,14 @@ export default function ReviewManage() {
   ];
 
   const batchButtons = selectedRowKeys.length > 0 ? [
-    <Popconfirm key="pass" title={`通过选中的 ${selectedRowKeys.length} 张照片？`} onConfirm={() => handleBatchReview(1)}>
+    <Popconfirm key="pass" title={`审核通过选中的 ${selectedRowKeys.length} 张照片？`} onConfirm={() => handleBatchReview(1)}>
       <Button type="primary" icon={<CheckOutlined />} loading={batchLoading}>
         {mobile ? `通过 (${selectedRowKeys.length})` : `批量通过 (${selectedRowKeys.length})`}
       </Button>
     </Popconfirm>,
-    <Popconfirm key="reject" title={`拒绝选中的 ${selectedRowKeys.length} 张照片？`} onConfirm={() => handleBatchReview(2)}>
+    <Popconfirm key="reject" title={`审核失败选中的 ${selectedRowKeys.length} 张照片？`} onConfirm={() => handleBatchReview(2)}>
       <Button danger icon={<CloseOutlined />} loading={batchLoading}>
-        {mobile ? `拒绝 (${selectedRowKeys.length})` : `批量拒绝 (${selectedRowKeys.length})`}
+        {mobile ? `失败 (${selectedRowKeys.length})` : `批量失败 (${selectedRowKeys.length})`}
       </Button>
     </Popconfirm>,
   ] : [];
@@ -234,6 +254,12 @@ export default function ReviewManage() {
                         {getLabel('review_status', record.review_status)}
                       </Tag>
                     </div>
+                    {(record.reviewed_by || record.reviewed_at) && (
+                      <div className={styles.cardMeta} style={{ marginTop: 6 }}>
+                        {record.reviewer_display_name || record.reviewed_by || '-'}
+                        {record.reviewed_at ? ` · ${formatReviewedAt(record.reviewed_at)}` : ''}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className={styles.cardActions}>{reviewActions(record)}</div>
@@ -265,7 +291,7 @@ export default function ReviewManage() {
               showTotal: (total) => `共 ${total} 张`,
               onChange: (page, pageSize) => loadPhotos(page, pageSize, statusFilter),
             }}
-            scroll={{ x: 900, y: 'calc(100vh - 200px)' }}
+            scroll={{ x: 1100, y: 'calc(100vh - 200px)' }}
           />
         </div>
       )}

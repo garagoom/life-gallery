@@ -127,28 +127,15 @@ async function initDb() {
   addColumnIfNotExists('palette', 'TEXT');
   addColumnIfNotExists('has_avif', 'INTEGER');
   addColumnIfNotExists('is_public', 'INTEGER DEFAULT 1');
+  addColumnIfNotExists('reviewed_by', 'TEXT');
+  addColumnIfNotExists('reviewed_at', 'DATETIME');
   try {
     db.run('UPDATE photos SET is_public = 1 WHERE is_public IS NULL');
   } catch (e) {}
 
-  // Add user profile columns if they don't exist
-  const addUserColumnIfNotExists = (columnName, columnType) => {
-    try {
-      db.run(`ALTER TABLE users ADD COLUMN ${columnName} ${columnType}`);
-    } catch (e) {
-      // Column already exists, ignore
-    }
-  };
-
-  addUserColumnIfNotExists('gender', 'TEXT');
-  addUserColumnIfNotExists('bio', 'TEXT');
-  addUserColumnIfNotExists('login_session', 'TEXT');
-  addUserColumnIfNotExists('must_change_password', 'INTEGER DEFAULT 0');
-
   // Add review_status to photos (0=pending, 1=approved, 2=rejected)
   try {
     db.run(`ALTER TABLE photos ADD COLUMN review_status INTEGER DEFAULT 1`);
-    // Set existing photos to approved
     db.run(`UPDATE photos SET review_status = 1 WHERE review_status IS NULL`);
   } catch (e) {}
 
@@ -167,6 +154,14 @@ async function initDb() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  const addUserColumnIfNotExists = (columnName, columnType) => {
+    try {
+      db.run(`ALTER TABLE users ADD COLUMN ${columnName} ${columnType}`);
+    } catch (e) {
+      // Column already exists, ignore
+    }
+  };
 
   addUserColumnIfNotExists('gender', 'TEXT');
   addUserColumnIfNotExists('bio', 'TEXT');
@@ -317,8 +312,8 @@ async function initDb() {
     ['role', 'creator', '创作者', 'blue', 2, 5],
     ['role', 'viewer', '访客', 'default', 1, 6],
     ['review_status', '0', '待审核', 'orange', null, 1],
-    ['review_status', '1', '已通过', 'green', null, 2],
-    ['review_status', '2', '已拒绝', 'red', null, 3],
+    ['review_status', '1', '审核通过', 'green', null, 2],
+    ['review_status', '2', '审核失败', 'red', null, 3],
     ['gender', 'male', '男', null, null, 1],
     ['gender', 'female', '女', null, null, 2],
     ['gender', 'secret', '保密', null, null, 3],
@@ -327,6 +322,10 @@ async function initDb() {
     db.run(`INSERT OR IGNORE INTO dictionaries (type, value, label, color, level, sort_order) VALUES (?, ?, ?, ?, ?, ?)`,
       [type, value, label, color, level, sort_order]);
   }
+
+  db.run(`UPDATE dictionaries SET label = '审核通过' WHERE type = 'review_status' AND value = '1'`);
+  db.run(`UPDATE dictionaries SET label = '审核失败' WHERE type = 'review_status' AND value = '2'`);
+  db.run(`UPDATE dictionaries SET label = '待审核' WHERE type = 'review_status' AND value = '0'`);
 
   // Add role_id column to users table
   try {
@@ -595,6 +594,12 @@ async function initDb() {
   db.run('CREATE INDEX IF NOT EXISTS idx_budget_items_budget_id ON budget_items(budget_id)');
   db.run('CREATE INDEX IF NOT EXISTS idx_budget_expenses_budget_id ON budget_expenses(budget_id)');
 
+  addColumnIfMissing(db, 'budget_items', 'quote_in', "TEXT DEFAULT 'trip'");
+  addColumnIfMissing(db, 'budget_items', 'amount_base', 'INTEGER');
+  addColumnIfMissing(db, 'budget_items', 'unit_amount_base', 'INTEGER');
+  addColumnIfMissing(db, 'budget_expenses', 'amount_base', 'INTEGER');
+  backfillBudgetBaseAmounts(db);
+
   migrateLegacyTripBudgets(db);
 
   // Backfill existing users: default avatar by gender, gender='secret' if null
@@ -662,6 +667,44 @@ function tableExists(database, name) {
     "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
     [name]
   );
+}
+
+function addColumnIfMissing(database, table, column, ddl) {
+  try {
+    database.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`);
+  } catch (e) {}
+}
+
+function backfillBudgetBaseAmounts(database) {
+  if (!tableExists(database, 'budgets')) return;
+  const { toBaseMinor } = require('./lib/tripMoney.cjs');
+  const budgets = sqlAll(database, 'SELECT id, trip_currency, base_currency, fx_rate FROM budgets');
+  for (const budget of budgets) {
+    const items = sqlAll(
+      database,
+      'SELECT id, amount, unit_amount, amount_base FROM budget_items WHERE budget_id = ?',
+      [budget.id]
+    );
+    for (const item of items) {
+      if (item.amount_base != null) continue;
+      const amountBase = toBaseMinor(item.amount || 0, budget.trip_currency, budget.base_currency, budget.fx_rate);
+      const unitBase = toBaseMinor(item.unit_amount || 0, budget.trip_currency, budget.base_currency, budget.fx_rate);
+      database.run(
+        'UPDATE budget_items SET amount_base = ?, unit_amount_base = COALESCE(unit_amount_base, ?) WHERE id = ?',
+        [amountBase, unitBase, item.id]
+      );
+    }
+    const expenses = sqlAll(
+      database,
+      'SELECT id, amount, amount_base FROM budget_expenses WHERE budget_id = ?',
+      [budget.id]
+    );
+    for (const expense of expenses) {
+      if (expense.amount_base != null) continue;
+      const amountBase = toBaseMinor(expense.amount || 0, budget.trip_currency, budget.base_currency, budget.fx_rate);
+      database.run('UPDATE budget_expenses SET amount_base = ? WHERE id = ?', [amountBase, expense.id]);
+    }
+  }
 }
 
 function migrateLegacyTripBudgets(database) {
