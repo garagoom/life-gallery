@@ -44,3 +44,21 @@ export function baseToForeign(amount, fxRate, tripCurrency = 'CNY') {
   const safeRate = Number.isFinite(rate) && rate > 0 ? rate : 1;
   return roundMoney((Number(amount) || 0) / safeRate, tripCurrency);
 }
+
+export function isQuoteBase(quoteIn) {
+  return quoteIn === 'base';
+}
+
+export function applyFxToBudgetItem(item, fxRate, tripCurrency, baseCurrency) {
+  if (item.status === 'booked') return item;
+  if (isQuoteBase(item.quote_in)) {
+    return {
+      ...item,
+      amount: baseToForeign(item.amount_cny, fxRate, tripCurrency),
+    };
+  }
+  return {
+    ...item,
+    amount_cny: foreignToBase(item.amount, fxRate, baseCurrency),
+  };
+}

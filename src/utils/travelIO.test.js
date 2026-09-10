@@ -63,6 +63,14 @@ describe('travelIO payload parsing', () => {
     expect(rows[0]).toEqual({ 标题: '关西游', 目的地: '大阪' });
   });
 
+  it('strips currency suffixes from money headers', () => {
+    const rows = rowsToObjects([
+      ['单价(日元)', '本币小计(人民币)'],
+      [155628, 6692],
+    ]);
+    expect(rows[0]).toEqual({ 单价: 155628, 本币小计: 6692 });
+  });
+
   it('parses a trip workbook payload', () => {
     const trip = parseTripPayload(
       {
@@ -128,11 +136,32 @@ describe('travelIO payload parsing', () => {
     });
     expect(budget.items).toHaveLength(2);
     expect(budget.items[1]).toMatchObject({ title: '岚山', optional: true, status: 'pending' });
+    expect(budget.items[0].quote_in).toBe('trip');
     expect(budget.expenses[0]).toMatchObject({
       title: '往返机票',
       budget_item_title: '往返机票',
       amount: 155628,
     });
+  });
+
+  it('parses base-quoted budget lines and frozen expense amounts', () => {
+    const budget = parseBudgetPayload(
+      { 标题: '关西预算', 出行币: 'JPY', 本币: 'CNY', 汇率: 0.05 },
+      [
+        {
+          类别: '机票', 项目: '往返机票', 数量: 1, 单价: 155628, 本币单价: 6692,
+          小计: 155628, 本币小计: 6692, 状态: '已订', 可选: '否', 主币: '本币',
+        },
+      ],
+      [
+        { 日期: '2026-09-07', 项目: '往返机票', 金额: 155628, 本币金额: 6692 },
+      ]
+    );
+    expect(budget.items[0]).toMatchObject({
+      quote_in: 'base',
+      amount_cny: 6692,
+    });
+    expect(budget.expenses[0].amount_cny).toBe(6692);
   });
 
   it('parses a combined plan from named sheets', () => {
@@ -181,6 +210,8 @@ describe('travelIO export helpers', () => {
     expect(markdown).toContain('# 关西预算');
     expect(markdown).toContain('| 机票 | 机票 |');
     expect(markdown).toContain('已订');
+    expect(markdown).toContain('金额(日元)');
+    expect(markdown).toContain('本币金额(人民币)');
   });
 
   it('sanitizes filenames and html', () => {
@@ -197,5 +228,7 @@ describe('travelIO export helpers', () => {
     expect(html).toContain('关西游');
     expect(html).toContain('DAY 1');
     expect(html).toContain('预算总览');
+    expect(html).toContain('金额(日元)');
+    expect(html).toContain('本币金额(人民币)');
   });
 });

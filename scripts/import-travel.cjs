@@ -105,9 +105,13 @@ function deleteTripTree(db, tripId) {
     const budgetId = budgetIdMap.get(item.budget_id);
     if (!budgetId) continue;
     db.run(
-      `INSERT INTO budget_items (budget_id, category, title, qty, unit_amount, amount, status, optional, note, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [budgetId, item.category, item.title, item.qty, item.unit_amount, item.amount, item.status, item.optional, item.note, item.sort_order]
+      `INSERT INTO budget_items
+        (budget_id, category, title, qty, unit_amount, unit_amount_base, amount, amount_base, quote_in, status, optional, note, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        budgetId, item.category, item.title, item.qty, item.unit_amount, item.unit_amount_base ?? null,
+        item.amount, item.amount_base ?? null, item.quote_in || 'trip', item.status, item.optional, item.note, item.sort_order,
+      ]
     );
     itemIdMap.set(item.id, lastId(db));
   }
@@ -118,10 +122,10 @@ function deleteTripTree(db, tripId) {
     const itemId = expense.budget_item_id ? itemIdMap.get(expense.budget_item_id) || null : null;
     db.run(
       `INSERT INTO budget_expenses (
-        budget_id, budget_item_id, category, title, amount, spent_on, note, created_by, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        budget_id, budget_item_id, category, title, amount, amount_base, spent_on, note, created_by, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        budgetId, itemId, expense.category, expense.title, expense.amount, expense.spent_on, expense.note,
+        budgetId, itemId, expense.category, expense.title, expense.amount, expense.amount_base ?? null, expense.spent_on, expense.note,
         mapUser(expense.created_by, prodNames, fallbackUser), expense.created_at, expense.updated_at,
       ]
     );

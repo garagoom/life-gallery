@@ -15,6 +15,9 @@ import {
   tripStatusLabel,
   budgetStatusLabel,
   categoryLabel,
+  quoteInLabel,
+  withCurrencyHeaders,
+  resolveBaseMajor,
 } from './travelIO';
 
 function createWorkbook() {
@@ -109,12 +112,12 @@ const SAMPLE_BUDGET = {
   note: 'ICOCA 等备注',
   is_main: false,
   items: [
-    { category: 'flight', title: '往返机票（双人）', qty: 1, unit_amount: 155628, amount: 155628, status: 'booked', optional: false, note: '' },
-    { category: 'lodging', title: '大阪日航 + 京都酒店', qty: 1, unit_amount: 125023, amount: 125023, status: 'booked', optional: false, note: '' },
-    { category: 'attraction', title: '岚山', qty: 2, unit_amount: 500, amount: 1000, status: 'pending', optional: true, note: '可选' },
+    { category: 'flight', title: '往返机票（双人）', amount: 155628, amount_cny: 6692, quote_in: 'base', status: 'booked', optional: false, note: '' },
+    { category: 'lodging', title: '大阪日航 + 京都酒店', amount: 125023, amount_cny: 5375.99, quote_in: 'trip', status: 'booked', optional: false, note: '' },
+    { category: 'attraction', title: '岚山', amount: 1000, amount_cny: 43, quote_in: 'trip', status: 'pending', optional: true, note: '可选' },
   ],
   expenses: [
-    { spent_on: '2026-09-07', title: '往返机票（双人）', category: 'flight', amount: 155628, note: '已订入账', budget_item_title: '往返机票（双人）' },
+    { spent_on: '2026-09-07', title: '往返机票（双人）', category: 'flight', amount: 155628, amount_cny: 6692, note: '已订入账', budget_item_title: '往返机票（双人）' },
   ],
 };
 
@@ -128,7 +131,7 @@ function fillPlanWorkbook(wb, trip, budget, { isTemplate = false } = {}) {
     `3. 出游状态：${TRIP_STATUS_MAP.map(([, label]) => label).join('、')}`,
     `4. 出行币 / 本币请填代码：${CURRENCY_CODES.join('、')}`,
     `5. 明细类别：${CATEGORY_MAP.map(([, label]) => label).join('、')}；状态：${BUDGET_STATUS_MAP.map(([, label]) => label).join('、')}`,
-    '6. 可选、主线填写「是」或「否」。金额按出行币填写。「实际记账」可留空。',
+    '6. 金额请同时填写出行币和本币（人民币）两列。机票等按人民币买的，主币选「本币」。可选、主线填「是」或「否」。',
     '7. 日期用 YYYY-MM-DD。当前灰色示例请全部替换成真实计划。',
   ] : [
     '出游计划导出',
@@ -167,29 +170,35 @@ function fillPlanWorkbook(wb, trip, budget, { isTemplate = false } = {}) {
     F: ['是', '否'],
   });
 
-  addSheet(wb, '预算明细', BUDGET_ITEM_HEADERS.map((h, i) => (i === 1 ? `${h}*` : h)), (budget?.items || budget?.budget_items || []).map((item) => [
+  const tripCurrency = budget?.trip_currency || 'CNY';
+  const baseCurrency = budget?.base_currency || 'CNY';
+  const fxRate = budget?.fx_rate ?? 1;
+
+  addSheet(wb, '预算明细', withCurrencyHeaders(BUDGET_ITEM_HEADERS, tripCurrency, baseCurrency).map((h, i) => (i === 1 ? `${h}*` : h)), (budget?.items || budget?.budget_items || []).map((item) => [
     categoryLabel(item.category),
     item.title || '',
-    item.qty ?? 1,
-    item.unit_amount ?? 0,
     item.amount ?? 0,
+    resolveBaseMajor(item.amount, item.amount_cny, fxRate, baseCurrency),
     budgetStatusLabel(item.status),
     item.optional ? '是' : '否',
+    quoteInLabel(item.quote_in),
     item.note || '',
-  ]), [10, 28, 8, 12, 12, 10, 8, 24], {
+  ]), [10, 28, 16, 16, 10, 8, 10, 24], {
     A: CATEGORY_MAP.map(([, label]) => label),
-    F: BUDGET_STATUS_MAP.map(([, label]) => label),
-    G: ['是', '否'],
+    E: BUDGET_STATUS_MAP.map(([, label]) => label),
+    F: ['是', '否'],
+    G: ['出行币', '本币'],
   });
 
-  addSheet(wb, '实际记账', EXPENSE_HEADERS.map((h, i) => (i === 1 ? `${h}*` : h)), (budget?.expenses || []).map((item) => [
+  addSheet(wb, '实际记账', withCurrencyHeaders(EXPENSE_HEADERS, tripCurrency, baseCurrency).map((h, i) => (i === 1 ? `${h}*` : h)), (budget?.expenses || []).map((item) => [
     item.spent_on || '',
     item.title || '',
     item.category ? categoryLabel(item.category) : '',
     item.amount ?? 0,
+    resolveBaseMajor(item.amount, item.amount_cny, fxRate, baseCurrency),
     item.budget_item_title || (budget?.items || []).find((row) => row.id === item.budget_item_id)?.title || '',
     item.note || '',
-  ]), [14, 28, 10, 12, 24, 24], {
+  ]), [14, 28, 10, 14, 16, 24, 24], {
     C: CATEGORY_MAP.map(([, label]) => label),
   });
 }

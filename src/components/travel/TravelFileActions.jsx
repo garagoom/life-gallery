@@ -57,6 +57,7 @@ async function applyPlanImport(file) {
       title: expense.title,
       category: expense.category,
       amount: expense.amount,
+      amount_cny: expense.amount_cny,
       spent_on: expense.spent_on,
       budget_item_id: linked?.id || null,
       note: expense.note,

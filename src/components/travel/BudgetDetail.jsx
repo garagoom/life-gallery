@@ -12,7 +12,7 @@ import {
 } from '../../api/budgets';
 import { getFxRate } from '../../api/fx';
 import { useDict } from '../../contexts/DictContext';
-import { formatMoney, roundMoney, remainingClass, foreignToBase, baseToForeign } from '../../utils/tripMoney';
+import { formatMoney, remainingClass, foreignToBase, baseToForeign, isQuoteBase, applyFxToBudgetItem } from '../../utils/tripMoney';
 import useIsMobile from '../../hooks/useIsMobile';
 import ListTable from '../ListTable';
 import CurrencySelect from './CurrencySelect';
@@ -73,12 +73,18 @@ export default function BudgetDetail() {
   const [askExpenseOpen, setAskExpenseOpen] = useState(false);
   const [addingExpenses, setAddingExpenses] = useState(false);
   const skipFx = useRef(true);
+  const lastItemFx = useRef({ fxRate: null, baseCurrency: null, tripCurrency: null });
   const tripCurrency = Form.useWatch('trip_currency', form) || budget?.trip_currency || 'CNY';
   const baseCurrency = Form.useWatch('base_currency', form) || budget?.base_currency || 'CNY';
   const fxRate = Form.useWatch('fx_rate', form) ?? budget?.fx_rate ?? 1;
 
   const applyBudget = useCallback((data) => {
     skipFx.current = true;
+    lastItemFx.current = {
+      fxRate: data.fx_rate,
+      baseCurrency: data.base_currency,
+      tripCurrency: data.trip_currency,
+    };
     setBudget(data);
     form.setFieldsValue({
       title: data.title,
@@ -91,9 +97,8 @@ export default function BudgetDetail() {
     setItems((data.items || []).map((item) => ({
       ...item,
       _key: `item-${item.id}`,
-      amountDirty: true,
+      quote_in: item.quote_in === 'base' ? 'base' : 'trip',
       amount_cny: item.amount_cny ?? foreignToBase(item.amount, data.fx_rate, data.base_currency),
-      unit_amount_cny: item.unit_amount_cny ?? foreignToBase(item.unit_amount, data.fx_rate, data.base_currency),
     })));
   }, [form]);
 
@@ -114,15 +119,16 @@ export default function BudgetDetail() {
   }, [load]);
 
   useEffect(() => {
+    const last = lastItemFx.current;
+    if (last.fxRate === fxRate && last.baseCurrency === baseCurrency && last.tripCurrency === tripCurrency) {
+      return;
+    }
+    lastItemFx.current = { fxRate, baseCurrency, tripCurrency };
     setItems((prev) => {
       if (!prev.length) return prev;
-      return prev.map((item) => ({
-        ...item,
-        amount_cny: foreignToBase(item.amount, fxRate, baseCurrency),
-        unit_amount_cny: foreignToBase(item.unit_amount, fxRate, baseCurrency),
-      }));
+      return prev.map((item) => applyFxToBudgetItem(item, fxRate, tripCurrency, baseCurrency));
     });
-  }, [fxRate, baseCurrency]);
+  }, [fxRate, baseCurrency, tripCurrency]);
 
   const refreshFx = async (from = tripCurrency, to = baseCurrency) => {
     if (!from || !to) return;
@@ -191,29 +197,19 @@ export default function BudgetDetail() {
     setItems((prev) => prev.map((item) => {
       if (item._key !== key) return item;
       const next = { ...item, [field]: value };
+      const locked = next.status === 'booked';
+      const quoteBase = isQuoteBase(next.quote_in);
       const toCny = (amount) => foreignToBase(amount, fxRate, baseCurrency);
       const toForeign = (amount) => baseToForeign(amount, fxRate, tripCurrency);
 
-      if (field === 'qty' || field === 'unit_amount') {
-        if (field === 'unit_amount') next.unit_amount_cny = toCny(Number(value) || 0);
-        if (!next.amountDirty) {
-          next.amount = roundMoney((Number(next.qty) || 0) * (Number(next.unit_amount) || 0), tripCurrency);
-          next.amount_cny = toCny(next.amount);
-        }
+      if (field === 'quote_in' && !locked) {
+        if (quoteBase) next.amount = toForeign(Number(next.amount_cny) || 0);
+        else next.amount_cny = toCny(Number(next.amount) || 0);
       }
-      if (field === 'unit_amount_cny') {
-        next.unit_amount = toForeign(Number(value) || 0);
-        if (!next.amountDirty) {
-          next.amount = roundMoney((Number(next.qty) || 0) * (Number(next.unit_amount) || 0), tripCurrency);
-          next.amount_cny = toCny(next.amount);
-        }
-      }
-      if (field === 'amount') {
-        next.amountDirty = true;
+      if (field === 'amount' && !locked) {
         next.amount_cny = toCny(Number(value) || 0);
       }
-      if (field === 'amount_cny') {
-        next.amountDirty = true;
+      if (field === 'amount_cny' && !locked) {
         next.amount = toForeign(Number(value) || 0);
       }
       return next;
@@ -239,9 +235,9 @@ export default function BudgetDetail() {
         id: item.id,
         category: item.category || 'misc',
         title: String(item.title || '').trim(),
-        qty: Number(item.qty) || 1,
-        unit_amount: Number(item.unit_amount) || 0,
+        quote_in: item.quote_in === 'base' ? 'base' : 'trip',
         amount: Number(item.amount) || 0,
+        amount_cny: Number(item.amount_cny) || 0,
         status: item.status || 'pending',
         optional: item.optional ? 1 : 0,
         note: item.note || '',
@@ -268,6 +264,7 @@ export default function BudgetDetail() {
           title: item.title,
           category: '',
           amount: item.amount,
+          amount_cny: item.amount_cny,
           spent_on: today,
           budget_item_id: item.id,
           note: item.note || '',
@@ -309,6 +306,7 @@ export default function BudgetDetail() {
         title: values.title,
         category: values.category,
         amount: values.amount,
+        amount_cny: values.amount_cny,
         spent_on: values.spent_on ? values.spent_on.format('YYYY-MM-DD') : null,
         budget_item_id: values.budget_item_id || null,
         note: values.note,
@@ -362,23 +360,21 @@ export default function BudgetDetail() {
       ),
     },
     {
-      title: '数量',
-      dataIndex: 'qty',
-      width: 88,
+      title: '主币',
+      dataIndex: 'quote_in',
+      width: 96,
       render: (value, record) => (
-        <InputNumber readOnly={preview} controls={!preview} min={0} value={value} onChange={(next) => patchBudget(record._key, 'qty', next)} style={{ width: '100%' }} />
+        <Switch
+          disabled={preview}
+          checked={isQuoteBase(value)}
+          checkedChildren="本币"
+          unCheckedChildren="出行币"
+          onChange={(checked) => patchBudget(record._key, 'quote_in', checked ? 'base' : 'trip')}
+        />
       ),
     },
     {
-      title: `单价 (${tripCurrency})`,
-      dataIndex: 'unit_amount',
-      width: 120,
-      render: (value, record) => (
-        <InputNumber readOnly={preview} controls={!preview} min={0} value={value} onChange={(next) => patchBudget(record._key, 'unit_amount', next)} style={{ width: '100%' }} />
-      ),
-    },
-    {
-      title: `小计 (${tripCurrency})`,
+      title: `金额 (${tripCurrency})`,
       dataIndex: 'amount',
       width: 130,
       render: (value, record) => (
@@ -386,7 +382,7 @@ export default function BudgetDetail() {
       ),
     },
     {
-      title: `小计 (${baseCurrency === 'CNY' ? '人民币' : baseCurrency})`,
+      title: `金额 (${baseCurrency === 'CNY' ? '人民币' : baseCurrency})`,
       dataIndex: 'amount_cny',
       width: 130,
       render: (value, record) => (
@@ -436,10 +432,10 @@ export default function BudgetDetail() {
       render: (value) => formatMoney(value, tripCurrency),
     },
     {
-      title: '人民币',
+      title: baseCurrency === 'CNY' ? '人民币' : baseCurrency,
       dataIndex: 'amount_cny',
       width: 110,
-      render: (value) => formatMoney(value, 'CNY'),
+      render: (value) => formatMoney(value, baseCurrency),
     },
     { title: '备注', dataIndex: 'note', ellipsis: true },
     !preview && {
@@ -563,9 +559,7 @@ export default function BudgetDetail() {
                     _key: nextKey('item'),
                     category: 'misc',
                     title: '',
-                    qty: 1,
-                    unit_amount: 0,
-                    unit_amount_cny: 0,
+                    quote_in: 'trip',
                     amount: 0,
                     amount_cny: 0,
                     status: 'pending',
@@ -600,23 +594,25 @@ export default function BudgetDetail() {
                         <Input readOnly={preview} value={record.title} onChange={(e) => patchBudget(record._key, 'title', e.target.value)} />
                       </div>
                       <div>
-                        <div className={styles.fieldLabel}>数量</div>
-                        <InputNumber readOnly={preview} controls={!preview} min={0} value={record.qty} onChange={(next) => patchBudget(record._key, 'qty', next)} style={{ width: '100%' }} />
-                      </div>
-                      <div>
                         <div className={styles.fieldLabel}>可选</div>
                         <Switch disabled={preview} checked={!!record.optional} onChange={(checked) => patchBudget(record._key, 'optional', checked)} />
                       </div>
                       <div>
-                        <div className={styles.fieldLabel}>单价 ({tripCurrency})</div>
-                        <InputNumber readOnly={preview} controls={!preview} min={0} value={record.unit_amount} onChange={(next) => patchBudget(record._key, 'unit_amount', next)} style={{ width: '100%' }} />
+                        <div className={styles.fieldLabel}>主币</div>
+                        <Switch
+                          disabled={preview}
+                          checked={isQuoteBase(record.quote_in)}
+                          checkedChildren="本币"
+                          unCheckedChildren="出行币"
+                          onChange={(checked) => patchBudget(record._key, 'quote_in', checked ? 'base' : 'trip')}
+                        />
                       </div>
                       <div>
-                        <div className={styles.fieldLabel}>小计 ({tripCurrency})</div>
+                        <div className={styles.fieldLabel}>金额 ({tripCurrency})</div>
                         <InputNumber readOnly={preview} controls={!preview} min={0} value={record.amount} onChange={(next) => patchBudget(record._key, 'amount', next)} style={{ width: '100%' }} />
                       </div>
-                      <div className={styles.fullField}>
-                        <div className={styles.fieldLabel}>小计 ({baseCurrency === 'CNY' ? '人民币' : baseCurrency})</div>
+                      <div>
+                        <div className={styles.fieldLabel}>金额 ({baseCurrency === 'CNY' ? '人民币' : baseCurrency})</div>
                         <InputNumber readOnly={preview} controls={!preview} min={0} value={record.amount_cny} onChange={(next) => patchBudget(record._key, 'amount_cny', next)} style={{ width: '100%' }} />
                       </div>
                     </div>
@@ -631,7 +627,7 @@ export default function BudgetDetail() {
               rowKey="_key"
               pagination={false}
               loading={loading}
-              scroll={{ x: 1280 }}
+              scroll={{ x: 1100 }}
             />
             )}
           </div>
@@ -652,7 +648,7 @@ export default function BudgetDetail() {
                       <span className={styles.cardMeta} style={{ marginTop: 0 }}>{record.spent_on || '未填日期'}</span>
                     </div>
                     <div className={styles.cardMeta}>
-                      {[record.category ? getLabel('expense_category', record.category) : null, `${formatMoney(record.amount, tripCurrency)} ${tripCurrency}`, `¥${formatMoney(record.amount_cny, 'CNY')}`]
+                      {[record.category ? getLabel('expense_category', record.category) : null, `${formatMoney(record.amount, tripCurrency)} ${tripCurrency}`, `${formatMoney(record.amount_cny, baseCurrency)} ${baseCurrency === 'CNY' ? '人民币' : baseCurrency}`]
                         .filter(Boolean)
                         .join(' · ')}
                     </div>
@@ -709,6 +705,7 @@ export default function BudgetDetail() {
                 min={0}
                 style={{ width: '100%' }}
                 onChange={(value) => {
+                  if (editingExpense) return;
                   expenseForm.setFieldValue('amount_cny', foreignToBase(value, fxRate, baseCurrency));
                 }}
               />
@@ -718,6 +715,7 @@ export default function BudgetDetail() {
                 min={0}
                 style={{ width: '100%' }}
                 onChange={(value) => {
+                  if (editingExpense) return;
                   expenseForm.setFieldValue('amount', baseToForeign(value, fxRate, tripCurrency));
                 }}
               />

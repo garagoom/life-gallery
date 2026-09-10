@@ -9,13 +9,17 @@ const {
   canReadTrip,
 } = require('../middleware/permission.cjs');
 const { isIsoDate } = require('../lib/tripDays.cjs');
+const { syncTripStatuses } = require('../lib/tripStatus.cjs');
 const {
-  toMinor,
   parseIncludeOptional,
   summarizeTrip,
   presentBudgetItem,
   presentExpense,
-  resolveBudgetAmount,
+  toMajor,
+  resolveItemMoney,
+  resolveItemUnitMoney,
+  persistBudgetItemMoney,
+  persistExpenseMoney,
 } = require('../lib/tripMoney.cjs');
 
 const router = express.Router();
@@ -63,11 +67,21 @@ function normalizeBudgetStatus(value, fallback = 'pending') {
   return BUDGET_STATUSES.has(status) ? status : fallback;
 }
 
-function markLinkedBudgetItemBooked(db, budgetId, budgetItemId) {
+function markLinkedBudgetItemBooked(db, budget, budgetItemId) {
   if (!budgetItemId) return;
+  const item = queryOne(
+    db,
+    'SELECT * FROM budget_items WHERE id = ? AND budget_id = ?',
+    [budgetItemId, budget.id]
+  );
+  if (!item) return;
+  const money = resolveItemMoney(item, budget);
+  const unit = resolveItemUnitMoney(item, budget);
   db.run(
-    `UPDATE budget_items SET status = 'booked' WHERE id = ? AND budget_id = ?`,
-    [budgetItemId, budgetId]
+    `UPDATE budget_items
+     SET status = 'booked', amount = ?, amount_base = ?, unit_amount = ?, unit_amount_base = ?
+     WHERE id = ? AND budget_id = ?`,
+    [money.tripMinor, money.baseMinor, unit.tripMinor, unit.baseMinor, budgetItemId, budget.id]
   );
 }
 
@@ -278,9 +292,14 @@ function loadAccessibleBudget(req, res) {
   return budget;
 }
 
+function refreshTripStatuses(db) {
+  if (syncTripStatuses(db)) saveDb();
+}
+
 router.get('/', authMiddleware, requireMenu('travel_budget'), (req, res) => {
   try {
     const db = getDb();
+    refreshTripStatuses(db);
     const includeOptional = parseIncludeOptional(req.query.include_optional);
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 10));
@@ -387,6 +406,7 @@ router.get('/:id', authMiddleware, requireMenu('travel_budget'), (req, res) => {
   try {
     const budget = loadAccessibleBudget(req, res);
     if (!budget) return;
+    refreshTripStatuses(getDb());
     const includeOptional = parseIncludeOptional(req.query.include_optional);
     success(res, presentBudgetDetail(budget, { includeOptional }));
   } catch (err) {
@@ -483,29 +503,36 @@ router.put('/:id/items', authMiddleware, requireMenu('travel_budget'), (req, res
     incoming.forEach((item, index) => {
       const title = String(item.title || '').trim();
       if (!title) return;
-      const { unitMinor, amountMinor } = resolveBudgetAmount(item, budget.trip_currency);
-      const category = String(item.category || 'misc');
-      const qty = Number(item.qty);
-      const safeQty = Number.isFinite(qty) && qty > 0 ? qty : 1;
       const status = normalizeBudgetStatus(item.status);
+      const persisted = persistBudgetItemMoney({ ...item, status }, budget);
+      const category = String(item.category || 'misc');
       const optional = item.optional === true || item.optional === 1 || item.optional === '1' ? 1 : 0;
       const note = item.note == null ? '' : String(item.note);
       const sortOrder = Number.isFinite(Number(item.sort_order)) ? Number(item.sort_order) : index;
+      const quoteIn = persisted.quoteIn;
 
       if (item.id && existing.some((row) => row.id === Number(item.id))) {
         db.run(
           `UPDATE budget_items
-           SET category = ?, title = ?, qty = ?, unit_amount = ?, amount = ?, status = ?, optional = ?, note = ?, sort_order = ?
+           SET category = ?, title = ?, qty = ?, unit_amount = ?, unit_amount_base = ?, amount = ?, amount_base = ?,
+               quote_in = ?, status = ?, optional = ?, note = ?, sort_order = ?
            WHERE id = ? AND budget_id = ?`,
-          [category, title, safeQty, unitMinor, amountMinor, status, optional, note, sortOrder, Number(item.id), budget.id]
+          [
+            category, title, persisted.safeQty, persisted.unitTrip, persisted.unitBase,
+            persisted.amountTrip, persisted.amountBase, quoteIn, status, optional, note, sortOrder,
+            Number(item.id), budget.id,
+          ]
         );
         keepIds.add(Number(item.id));
       } else {
         db.run(
           `INSERT INTO budget_items
-            (budget_id, category, title, qty, unit_amount, amount, status, optional, note, sort_order)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [budget.id, category, title, safeQty, unitMinor, amountMinor, status, optional, note, sortOrder]
+            (budget_id, category, title, qty, unit_amount, unit_amount_base, amount, amount_base, quote_in, status, optional, note, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            budget.id, category, title, persisted.safeQty, persisted.unitTrip, persisted.unitBase,
+            persisted.amountTrip, persisted.amountBase, quoteIn, status, optional, note, sortOrder,
+          ]
         );
         keepIds.add(lastInsertId(db));
       }
@@ -535,7 +562,7 @@ router.post('/:id/expenses', authMiddleware, requireMenu('travel_budget'), (req,
     if (forbidIfCannotWrite(req, res, budget)) return;
     const title = String(req.body?.title || '').trim();
     if (!title) return error(res, '请填写消费项目', 400);
-    const amountMinor = toMinor(req.body?.amount, budget.trip_currency);
+    const { amountMinor, amountBaseMinor } = persistExpenseMoney(req.body, budget);
     const category = req.body?.category ? String(req.body.category) : '';
     const spentOn = isIsoDate(req.body?.spent_on) ? req.body.spent_on : null;
     const note = req.body?.note == null ? '' : String(req.body.note);
@@ -551,11 +578,11 @@ router.post('/:id/expenses', authMiddleware, requireMenu('travel_budget'), (req,
     }
     db.run(
       `INSERT INTO budget_expenses
-        (budget_id, budget_item_id, category, title, amount, spent_on, note, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [budget.id, budgetItemId, category, title, amountMinor, spentOn, note, req.user.username]
+        (budget_id, budget_item_id, category, title, amount, amount_base, spent_on, note, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [budget.id, budgetItemId, category, title, amountMinor, amountBaseMinor, spentOn, note, req.user.username]
     );
-    markLinkedBudgetItemBooked(db, budget.id, budgetItemId);
+    markLinkedBudgetItemBooked(db, budget, budgetItemId);
     saveDb();
     success(res, presentBudgetDetail(getBudget(db, budget.id)), '记账成功', 201);
   } catch (err) {
@@ -579,7 +606,20 @@ router.put('/:id/expenses/:eid', authMiddleware, requireMenu('travel_budget'), (
 
     const title = req.body?.title != null ? String(req.body.title).trim() : expense.title;
     if (!title) return error(res, '请填写消费项目', 400);
-    const amountMinor = req.body?.amount != null ? toMinor(req.body.amount, budget.trip_currency) : expense.amount;
+    let amountMinor = expense.amount;
+    let amountBaseMinor = expense.amount_base;
+    if (req.body?.amount != null || req.body?.amount_cny != null) {
+      const persisted = persistExpenseMoney({
+        amount: req.body.amount != null ? req.body.amount : toMajor(expense.amount, budget.trip_currency),
+        amount_cny: req.body.amount_cny != null
+          ? req.body.amount_cny
+          : (req.body.amount == null && expense.amount_base != null
+            ? toMajor(expense.amount_base, budget.base_currency)
+            : undefined),
+      }, budget);
+      amountMinor = persisted.amountMinor;
+      amountBaseMinor = persisted.amountBaseMinor;
+    }
     const category = req.body?.category != null ? String(req.body.category) : expense.category;
     const spentOn = req.body?.spent_on !== undefined
       ? (isIsoDate(req.body.spent_on) ? req.body.spent_on : null)
@@ -599,11 +639,11 @@ router.put('/:id/expenses/:eid', authMiddleware, requireMenu('travel_budget'), (
 
     db.run(
       `UPDATE budget_expenses
-       SET budget_item_id = ?, category = ?, title = ?, amount = ?, spent_on = ?, note = ?, updated_at = CURRENT_TIMESTAMP
+       SET budget_item_id = ?, category = ?, title = ?, amount = ?, amount_base = ?, spent_on = ?, note = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND budget_id = ?`,
-      [budgetItemId, category, title, amountMinor, spentOn, note, expense.id, budget.id]
+      [budgetItemId, category, title, amountMinor, amountBaseMinor, spentOn, note, expense.id, budget.id]
     );
-    markLinkedBudgetItemBooked(db, budget.id, budgetItemId);
+    markLinkedBudgetItemBooked(db, budget, budgetItemId);
     saveDb();
     success(res, presentBudgetDetail(getBudget(db, budget.id)), '记账已更新');
   } catch (err) {

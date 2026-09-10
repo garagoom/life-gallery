@@ -14,11 +14,33 @@ function toMajor(minor, currency) {
   return Number(minor || 0) / currencyScale(currency);
 }
 
-function toBaseMinor(foreignMinor, tripCurrency, baseCurrency, fxRate) {
+function safeFx(fxRate) {
   const rate = Number(fxRate);
-  const safeRate = Number.isFinite(rate) && rate > 0 ? rate : 1;
+  return Number.isFinite(rate) && rate > 0 ? rate : 1;
+}
+
+function toBaseMinor(foreignMinor, tripCurrency, baseCurrency, fxRate) {
   const foreignMajor = toMajor(foreignMinor, tripCurrency);
-  return toMinor(foreignMajor * safeRate, baseCurrency);
+  return toMinor(foreignMajor * safeFx(fxRate), baseCurrency);
+}
+
+function fromTripMinor(tripMinor, trip) {
+  const tripCurrency = trip.trip_currency || 'CNY';
+  const baseCurrency = trip.base_currency || 'CNY';
+  return {
+    tripMinor: Number(tripMinor) || 0,
+    baseMinor: toBaseMinor(tripMinor, tripCurrency, baseCurrency, trip.fx_rate),
+  };
+}
+
+function fromBaseMinor(baseMinor, trip) {
+  const tripCurrency = trip.trip_currency || 'CNY';
+  const baseCurrency = trip.base_currency || 'CNY';
+  const baseMajor = toMajor(baseMinor, baseCurrency);
+  return {
+    tripMinor: toMinor(baseMajor / safeFx(trip.fx_rate), tripCurrency),
+    baseMinor: Number(baseMinor) || 0,
+  };
 }
 
 function roundMajor(value, currency) {
@@ -32,6 +54,54 @@ function parseIncludeOptional(value) {
   return text === '1' || text === 'true' || text === 'yes';
 }
 
+function normalizeQuoteIn(value) {
+  return value === 'base' ? 'base' : 'trip';
+}
+
+function hasStoredBase(value) {
+  return value != null && value !== '';
+}
+
+function resolveQuotedMoney({ quoteIn, tripMinor, baseMinor, locked }, trip) {
+  if (locked && hasStoredBase(baseMinor)) {
+    return {
+      tripMinor: Number(tripMinor) || 0,
+      baseMinor: Number(baseMinor) || 0,
+    };
+  }
+  if (normalizeQuoteIn(quoteIn) === 'base' && hasStoredBase(baseMinor)) {
+    return fromBaseMinor(baseMinor, trip);
+  }
+  return fromTripMinor(tripMinor, trip);
+}
+
+function resolveItemMoney(item, trip) {
+  return resolveQuotedMoney({
+    quoteIn: item.quote_in,
+    tripMinor: item.amount,
+    baseMinor: item.amount_base,
+    locked: item.status === 'booked',
+  }, trip);
+}
+
+function resolveItemUnitMoney(item, trip) {
+  return resolveQuotedMoney({
+    quoteIn: item.quote_in,
+    tripMinor: item.unit_amount,
+    baseMinor: item.unit_amount_base,
+    locked: item.status === 'booked',
+  }, trip);
+}
+
+function resolveExpenseMoney(expense, trip) {
+  return resolveQuotedMoney({
+    quoteIn: 'trip',
+    tripMinor: expense.amount,
+    baseMinor: expense.amount_base,
+    locked: true,
+  }, trip);
+}
+
 function itemInSummary(item, includeOptional) {
   if (includeOptional) return true;
   return Number(item.optional) !== 1;
@@ -40,61 +110,72 @@ function itemInSummary(item, includeOptional) {
 function summarizeTrip(trip, items = [], expenses = [], { includeOptional = false } = {}) {
   const tripCurrency = trip.trip_currency || 'CNY';
   const baseCurrency = trip.base_currency || 'CNY';
-  const fxRate = trip.fx_rate == null ? 1 : Number(trip.fx_rate);
   const partySize = Math.max(1, Number(trip.party_size) || 1);
 
-  let plannedMinor = 0;
-  let bookedMinor = 0;
-  let pendingMinor = 0;
+  let plannedTrip = 0;
+  let plannedBase = 0;
+  let bookedTrip = 0;
+  let bookedBase = 0;
+  let pendingTrip = 0;
+  let pendingBase = 0;
   const byCategory = {};
 
   for (const item of items) {
     if (!itemInSummary(item, includeOptional)) continue;
-    const amount = Number(item.amount) || 0;
-    plannedMinor += amount;
-    if (item.status === 'booked') bookedMinor += amount;
-    else pendingMinor += amount;
+    const money = resolveItemMoney(item, trip);
+    plannedTrip += money.tripMinor;
+    plannedBase += money.baseMinor;
+    if (item.status === 'booked') {
+      bookedTrip += money.tripMinor;
+      bookedBase += money.baseMinor;
+    } else {
+      pendingTrip += money.tripMinor;
+      pendingBase += money.baseMinor;
+    }
 
     const key = item.category || 'misc';
     if (!byCategory[key]) {
-      byCategory[key] = { category: key, planned_minor: 0, spent_minor: 0 };
+      byCategory[key] = { category: key, planned_trip: 0, planned_base: 0, spent_trip: 0, spent_base: 0 };
     }
-    byCategory[key].planned_minor += amount;
+    byCategory[key].planned_trip += money.tripMinor;
+    byCategory[key].planned_base += money.baseMinor;
   }
 
-  let spentMinor = 0;
+  let spentTrip = 0;
+  let spentBase = 0;
   for (const expense of expenses) {
-    const amount = Number(expense.amount) || 0;
-    spentMinor += amount;
+    const money = resolveExpenseMoney(expense, trip);
+    spentTrip += money.tripMinor;
+    spentBase += money.baseMinor;
     const key = expense.category || 'misc';
     if (!byCategory[key]) {
-      byCategory[key] = { category: key, planned_minor: 0, spent_minor: 0 };
+      byCategory[key] = { category: key, planned_trip: 0, planned_base: 0, spent_trip: 0, spent_base: 0 };
     }
-    byCategory[key].spent_minor += amount;
+    byCategory[key].spent_trip += money.tripMinor;
+    byCategory[key].spent_base += money.baseMinor;
   }
 
-  const toPair = (minor) => ({
-    amount: toMajor(minor, tripCurrency),
-    amount_cny: toMajor(toBaseMinor(minor, tripCurrency, baseCurrency, fxRate), baseCurrency),
+  const toPair = (tripMinor, baseMinor) => ({
+    amount: toMajor(tripMinor, tripCurrency),
+    amount_cny: toMajor(baseMinor, baseCurrency),
   });
 
-  const planned = toPair(plannedMinor);
-  const booked = toPair(bookedMinor);
-  const pending = toPair(pendingMinor);
-  const spent = toPair(spentMinor);
-  const remainingMinor = plannedMinor - spentMinor;
-  const remaining = toPair(remainingMinor);
+  const planned = toPair(plannedTrip, plannedBase);
+  const booked = toPair(bookedTrip, bookedBase);
+  const pending = toPair(pendingTrip, pendingBase);
+  const spent = toPair(spentTrip, spentBase);
+  const remaining = toPair(plannedTrip - spentTrip, plannedBase - spentBase);
 
   const categoryRows = Object.values(byCategory).map((row) => {
-    const plannedPair = toPair(row.planned_minor);
-    const spentPair = toPair(row.spent_minor);
+    const plannedPair = toPair(row.planned_trip, row.planned_base);
+    const spentPair = toPair(row.spent_trip, row.spent_base);
     return {
       category: row.category,
       planned: plannedPair.amount,
       planned_cny: plannedPair.amount_cny,
       spent: spentPair.amount,
       spent_cny: spentPair.amount_cny,
-      share: plannedMinor > 0 ? row.planned_minor / plannedMinor : 0,
+      share: plannedTrip > 0 ? row.planned_trip / plannedTrip : 0,
     };
   });
 
@@ -119,28 +200,28 @@ function summarizeTrip(trip, items = [], expenses = [], { includeOptional = fals
 function presentBudgetItem(row, trip) {
   const currency = trip.trip_currency || 'CNY';
   const baseCurrency = trip.base_currency || 'CNY';
-  const fxRate = trip.fx_rate == null ? 1 : Number(trip.fx_rate);
-  const amountCny = toMajor(toBaseMinor(row.amount, currency, baseCurrency, fxRate), baseCurrency);
-  const unitCny = toMajor(toBaseMinor(row.unit_amount, currency, baseCurrency, fxRate), baseCurrency);
+  const money = resolveItemMoney(row, trip);
+  const unit = resolveItemUnitMoney(row, trip);
   return {
     ...row,
+    quote_in: normalizeQuoteIn(row.quote_in),
     qty: Number(row.qty) || 0,
     optional: Number(row.optional) === 1,
-    unit_amount: toMajor(row.unit_amount, currency),
-    amount: toMajor(row.amount, currency),
-    unit_amount_cny: unitCny,
-    amount_cny: amountCny,
+    unit_amount: toMajor(unit.tripMinor, currency),
+    amount: toMajor(money.tripMinor, currency),
+    unit_amount_cny: toMajor(unit.baseMinor, baseCurrency),
+    amount_cny: toMajor(money.baseMinor, baseCurrency),
   };
 }
 
 function presentExpense(row, trip) {
   const currency = trip.trip_currency || 'CNY';
   const baseCurrency = trip.base_currency || 'CNY';
-  const fxRate = trip.fx_rate == null ? 1 : Number(trip.fx_rate);
+  const money = resolveExpenseMoney(row, trip);
   return {
     ...row,
-    amount: toMajor(row.amount, currency),
-    amount_cny: toMajor(toBaseMinor(row.amount, currency, baseCurrency, fxRate), baseCurrency),
+    amount: toMajor(money.tripMinor, currency),
+    amount_cny: toMajor(money.baseMinor, baseCurrency),
   };
 }
 
@@ -154,15 +235,89 @@ function resolveBudgetAmount({ qty, unit_amount, amount }, currency) {
   return { unitMinor, amountMinor: Math.round(multiplier * unitMinor) };
 }
 
+function persistBudgetItemMoney(item, trip) {
+  const quoteIn = normalizeQuoteIn(item.quote_in);
+  const locked = item.status === 'booked';
+  const qty = Number(item.qty);
+  const safeQty = Number.isFinite(qty) && qty > 0 ? qty : 1;
+  const tripCurrency = trip.trip_currency || 'CNY';
+  const baseCurrency = trip.base_currency || 'CNY';
+  const hasAmount = item.amount != null && item.amount !== '';
+  const hasAmountCny = item.amount_cny != null && item.amount_cny !== '';
+  const unitTrip = toMinor(item.unit_amount, tripCurrency);
+  const hasUnitBase = item.unit_amount_cny != null && item.unit_amount_cny !== '';
+  const unitBase = hasUnitBase ? toMinor(item.unit_amount_cny, baseCurrency) : fromTripMinor(unitTrip, trip).baseMinor;
+
+  let amountTrip;
+  let amountBase;
+  if (locked) {
+    amountTrip = hasAmount ? toMinor(item.amount, tripCurrency) : Math.round(safeQty * unitTrip);
+    amountBase = hasAmountCny ? toMinor(item.amount_cny, baseCurrency) : fromTripMinor(amountTrip, trip).baseMinor;
+  } else if (quoteIn === 'base') {
+    const baseMinor = hasAmountCny
+      ? toMinor(item.amount_cny, baseCurrency)
+      : Math.round(safeQty * unitBase);
+    const pair = fromBaseMinor(baseMinor, trip);
+    amountTrip = pair.tripMinor;
+    amountBase = pair.baseMinor;
+  } else if (hasAmount) {
+    const pair = fromTripMinor(toMinor(item.amount, tripCurrency), trip);
+    amountTrip = pair.tripMinor;
+    amountBase = pair.baseMinor;
+  } else {
+    amountTrip = Math.round(safeQty * unitTrip);
+    amountBase = fromTripMinor(amountTrip, trip).baseMinor;
+  }
+
+  return {
+    quoteIn,
+    safeQty: 1,
+    unitTrip: amountTrip,
+    unitBase: amountBase,
+    amountTrip,
+    amountBase,
+  };
+}
+
+function persistExpenseMoney(body, trip) {
+  const tripCurrency = trip.trip_currency || 'CNY';
+  const baseCurrency = trip.base_currency || 'CNY';
+  const hasAmount = body?.amount != null && body.amount !== '';
+  const hasCny = body?.amount_cny != null && body.amount_cny !== '';
+  if (hasAmount && hasCny) {
+    return {
+      amountMinor: toMinor(body.amount, tripCurrency),
+      amountBaseMinor: toMinor(body.amount_cny, baseCurrency),
+    };
+  }
+  if (hasCny) {
+    const pair = fromBaseMinor(toMinor(body.amount_cny, baseCurrency), trip);
+    return { amountMinor: pair.tripMinor, amountBaseMinor: pair.baseMinor };
+  }
+  const amountMinor = toMinor(body?.amount, tripCurrency);
+  return {
+    amountMinor,
+    amountBaseMinor: toBaseMinor(amountMinor, tripCurrency, baseCurrency, trip.fx_rate),
+  };
+}
+
 module.exports = {
   currencyScale,
   toMinor,
   toMajor,
   toBaseMinor,
+  fromTripMinor,
+  fromBaseMinor,
   roundMajor,
   parseIncludeOptional,
+  normalizeQuoteIn,
+  resolveItemMoney,
+  resolveItemUnitMoney,
+  resolveExpenseMoney,
   summarizeTrip,
   presentBudgetItem,
   presentExpense,
   resolveBudgetAmount,
+  persistBudgetItemMoney,
+  persistExpenseMoney,
 };

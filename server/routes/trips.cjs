@@ -9,6 +9,7 @@ const {
   canWriteTrip,
 } = require('../middleware/permission.cjs');
 const { buildDaysFromRange, isIsoDate } = require('../lib/tripDays.cjs');
+const { syncTripStatuses } = require('../lib/tripStatus.cjs');
 
 const router = express.Router();
 
@@ -142,6 +143,10 @@ function forbidIfCannotWrite(req, res, trip) {
   return false;
 }
 
+function refreshTripStatuses(db) {
+  if (syncTripStatuses(db)) saveDb();
+}
+
 function loadAccessibleTrip(req, res) {
   const db = getDb();
   const trip = getTrip(db, req.params.id);
@@ -159,6 +164,7 @@ function loadAccessibleTrip(req, res) {
 router.get('/', authMiddleware, requireAnyMenu('travel_trips', 'travel_budget'), (req, res) => {
   try {
     const db = getDb();
+    refreshTripStatuses(db);
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 10));
     const listFilter = buildTripListFilter(req.user);
@@ -250,7 +256,9 @@ router.get('/:id', authMiddleware, requireAnyMenu('travel_trips', 'travel_budget
   try {
     const trip = loadAccessibleTrip(req, res);
     if (!trip) return;
-    success(res, presentTripDetail(trip));
+    const db = getDb();
+    refreshTripStatuses(db);
+    success(res, presentTripDetail(getTrip(db, trip.id)));
   } catch (err) {
     console.error('Get trip error:', err);
     error(res, '获取出游计划失败');

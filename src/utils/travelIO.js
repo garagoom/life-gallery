@@ -1,4 +1,5 @@
 import dayjs from 'dayjs';
+import { foreignToBase } from './tripMoney';
 
 export const TRIP_STATUS_MAP = [
   ['planning', '筹划中'],
@@ -31,11 +32,15 @@ export const CURRENCY_CODES = ['CNY', 'JPY', 'USD', 'EUR', 'KRW', 'HKD', 'THB'];
 export const TRIP_META_HEADERS = ['标题', '目的地', '开始日期', '结束日期', '状态', '人数', '行程备注'];
 export const TRIP_DAY_HEADERS = ['DAY', '日期', '主题', '住宿', '备注'];
 export const BUDGET_META_HEADERS = ['出行币', '本币', '汇率', '汇率日期', '备注', '主线'];
-export const BUDGET_ITEM_HEADERS = ['类别', '项目', '数量', '单价', '小计', '状态', '可选', '备注'];
-export const EXPENSE_HEADERS = ['日期', '项目', '类别', '金额', '对照预算项目', '备注'];
+export const BUDGET_ITEM_HEADERS = ['类别', '项目', '金额', '本币金额', '状态', '可选', '主币', '备注'];
+export const EXPENSE_HEADERS = ['日期', '项目', '类别', '金额', '本币金额', '对照预算项目', '备注'];
 
 export function normHeader(value) {
-  return String(value || '').replace(/\*+$/g, '').replace(/\s+/g, '').trim();
+  return String(value || '')
+    .replace(/\*+$/g, '')
+    .replace(/[(（][^)）]*[)）]\s*$/g, '')
+    .replace(/\s+/g, '')
+    .trim();
 }
 
 export function cellText(value) {
@@ -72,6 +77,15 @@ export function parseNumber(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function parseOptionalNumber(value) {
+  if (value == null || value === '') return undefined;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const text = cellText(value).replace(/,/g, '');
+  if (!text) return undefined;
+  const n = Number(text);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 export function parseYesNo(value) {
   const text = cellText(value).toLowerCase();
   return text === '是' || text === '1' || text === 'true' || text === 'yes' || text === 'y';
@@ -106,6 +120,49 @@ export function parseCurrency(value, fallback = 'CNY') {
   if (CURRENCY_CODES.includes(text)) return text;
   const aliases = { 人民币: 'CNY', 日元: 'JPY', 美元: 'USD', 欧元: 'EUR', 韩元: 'KRW', 港币: 'HKD', 泰铢: 'THB' };
   return aliases[cellText(value)] || fallback;
+}
+
+export function parseQuoteIn(value) {
+  const text = cellText(value).toLowerCase();
+  if (text === 'base' || text === '本币' || text === '人民币') return 'base';
+  return 'trip';
+}
+
+export function quoteInLabel(value) {
+  return value === 'base' ? '本币' : '出行币';
+}
+
+export function currencyDisplayName(code) {
+  const aliases = {
+    CNY: '人民币',
+    JPY: '日元',
+    USD: '美元',
+    EUR: '欧元',
+    KRW: '韩元',
+    HKD: '港币',
+    THB: '泰铢',
+  };
+  const normalized = String(code || 'CNY').toUpperCase();
+  return aliases[normalized] || normalized;
+}
+
+export function moneyColumnHeader(label, currency) {
+  return `${label}(${currencyDisplayName(currency)})`;
+}
+
+export function withCurrencyHeaders(headers, tripCurrency, baseCurrency) {
+  const tripCols = new Set(['单价', '小计', '金额']);
+  const baseCols = new Set(['本币单价', '本币小计', '本币金额']);
+  return headers.map((header) => {
+    if (tripCols.has(header)) return moneyColumnHeader(header, tripCurrency);
+    if (baseCols.has(header)) return moneyColumnHeader(header, baseCurrency);
+    return header;
+  });
+}
+
+export function resolveBaseMajor(tripAmount, baseAmount, fxRate, baseCurrency) {
+  if (baseAmount != null && baseAmount !== '') return Number(baseAmount);
+  return foreignToBase(tripAmount, fxRate, baseCurrency);
 }
 
 export function tripStatusLabel(value) {
@@ -160,17 +217,28 @@ export function parseTripPayload(metaRow = {}, dayRows = []) {
 export function parseBudgetPayload(metaRow = {}, itemRows = [], expenseRows = []) {
   const title = cellText(metaRow['标题']);
   const items = itemRows
-    .map((row, index) => ({
-      category: parseCategory(row['类别']),
-      title: cellText(row['项目']),
-      qty: parseNumber(row['数量'], 1),
-      unit_amount: parseNumber(row['单价'], 0),
-      amount: parseNumber(row['小计'], 0),
-      status: parseBudgetStatus(row['状态']),
-      optional: parseYesNo(row['可选']),
-      note: cellText(row['备注']),
-      sort_order: index,
-    }))
+    .map((row, index) => {
+      const qty = parseNumber(row['数量'], 1);
+      const unitAmount = parseNumber(row['单价'], 0);
+      const unitAmountCny = parseOptionalNumber(row['本币单价']);
+      let amount = parseOptionalNumber(row['金额']);
+      if (amount == null) amount = parseNumber(row['小计'], 0);
+      if (!amount && unitAmount) amount = qty * unitAmount;
+      let amountCny = parseOptionalNumber(row['本币金额']);
+      if (amountCny == null) amountCny = parseOptionalNumber(row['本币小计']);
+      if (amountCny == null && unitAmountCny != null) amountCny = qty * unitAmountCny;
+      return {
+        category: parseCategory(row['类别']),
+        title: cellText(row['项目']),
+        quote_in: parseQuoteIn(row['主币']),
+        amount,
+        amount_cny: amountCny,
+        status: parseBudgetStatus(row['状态']),
+        optional: parseYesNo(row['可选']),
+        note: cellText(row['备注']),
+        sort_order: index,
+      };
+    })
     .filter((item) => item.title);
 
   const expenses = expenseRows
@@ -179,6 +247,7 @@ export function parseBudgetPayload(metaRow = {}, itemRows = [], expenseRows = []
       title: cellText(row['项目']),
       category: cellText(row['类别']) ? parseCategory(row['类别']) : '',
       amount: parseNumber(row['金额'], 0),
+      amount_cny: parseOptionalNumber(row['本币金额']),
       budget_item_title: cellText(row['对照预算项目']),
       note: cellText(row['备注']),
     }))
@@ -257,37 +326,44 @@ export function buildBudgetMarkdown(budget) {
   const tripTitle = budget.trip?.title || budget.trip_title || '未关联';
   const dates = [budget.trip?.start_date, budget.trip?.end_date].filter(Boolean).join(' ~ ');
   const stats = budget.summary_stats || {};
+  const tripCur = budget.trip_currency || 'CNY';
+  const baseCur = budget.base_currency || 'CNY';
+  const tripName = currencyDisplayName(tripCur);
+  const baseName = currencyDisplayName(baseCur);
+  const fxRate = budget.fx_rate ?? 1;
   const lines = [
     `# ${budget.title || '预算'}`,
     '',
     `- 关联出游：${tripTitle}`,
     dates ? `- 日期：${dates}` : null,
     `- 人数：${budget.party_size || 1}`,
-    `- 出行币：${budget.trip_currency || 'CNY'}`,
-    `- 本币：${budget.base_currency || 'CNY'}`,
-    `- 汇率：${budget.fx_rate ?? 1}`,
+    `- 出行币：${tripCur}`,
+    `- 本币：${baseCur}`,
+    `- 汇率：${fxRate}`,
     budget.fx_date ? `- 汇率日期：${budget.fx_date}` : null,
     '',
     '## 汇总',
     '',
-    `- 计划合计：${stats.planned_total ?? '-'} ${budget.trip_currency || ''} / ${stats.planned_total_cny ?? '-'} CNY`,
-    `- 已订：${stats.booked_total ?? '-'} / ${stats.booked_total_cny ?? '-'} CNY`,
-    `- 已支出：${stats.spent_total ?? '-'} / ${stats.spent_total_cny ?? '-'} CNY`,
-    `- 剩余：${stats.remaining ?? '-'} / ${stats.remaining_cny ?? '-'} CNY`,
+    `- 计划合计：${stats.planned_total ?? '-'} ${tripName} / ${stats.planned_total_cny ?? '-'} ${baseName}`,
+    `- 已订：${stats.booked_total ?? '-'} ${tripName} / ${stats.booked_total_cny ?? '-'} ${baseName}`,
+    `- 已支出：${stats.spent_total ?? '-'} ${tripName} / ${stats.spent_total_cny ?? '-'} ${baseName}`,
+    `- 剩余：${stats.remaining ?? '-'} ${tripName} / ${stats.remaining_cny ?? '-'} ${baseName}`,
     '',
     '## 预算明细',
     '',
-    '| 类别 | 项目 | 数量 | 单价 | 小计 | 状态 | 可选 | 备注 |',
+    `| 类别 | 项目 | 金额(${tripName}) | 本币金额(${baseName}) | 状态 | 可选 | 主币 | 备注 |`,
     '| --- | --- | --- | --- | --- | --- | --- | --- |',
   ].filter((line) => line != null);
 
   (budget.items || budget.budget_items || []).forEach((item) => {
-    lines.push(`| ${categoryLabel(item.category)} | ${item.title || ''} | ${item.qty ?? ''} | ${item.unit_amount ?? ''} | ${item.amount ?? ''} | ${budgetStatusLabel(item.status)} | ${item.optional ? '是' : '否'} | ${item.note || ''} |`);
+    const amountBase = resolveBaseMajor(item.amount, item.amount_cny, fxRate, baseCur);
+    lines.push(`| ${categoryLabel(item.category)} | ${item.title || ''} | ${item.amount ?? ''} | ${amountBase} | ${budgetStatusLabel(item.status)} | ${item.optional ? '是' : '否'} | ${quoteInLabel(item.quote_in)} | ${item.note || ''} |`);
   });
 
-  lines.push('', '## 实际记账', '', '| 日期 | 项目 | 类别 | 金额 | 备注 |', '| --- | --- | --- | --- | --- |');
+  lines.push('', '## 实际记账', '', `| 日期 | 项目 | 类别 | 金额(${tripName}) | 本币金额(${baseName}) | 备注 |`, '| --- | --- | --- | --- | --- | --- |');
   (budget.expenses || []).forEach((item) => {
-    lines.push(`| ${item.spent_on || ''} | ${item.title || ''} | ${item.category ? categoryLabel(item.category) : ''} | ${item.amount ?? ''} | ${item.note || ''} |`);
+    const amountBase = resolveBaseMajor(item.amount, item.amount_cny, fxRate, baseCur);
+    lines.push(`| ${item.spent_on || ''} | ${item.title || ''} | ${item.category ? categoryLabel(item.category) : ''} | ${item.amount ?? ''} | ${amountBase} | ${item.note || ''} |`);
   });
 
   if (budget.note) {
@@ -328,15 +404,20 @@ export function buildTripHtml(trip) {
 }
 
 export function buildBudgetHtml(budget) {
+  const tripCur = budget.trip_currency || 'CNY';
+  const baseCur = budget.base_currency || 'CNY';
+  const fxRate = budget.fx_rate ?? 1;
+  const tripName = currencyDisplayName(tripCur);
+  const baseName = currencyDisplayName(baseCur);
   const items = (budget.items || budget.budget_items || []).map((item) => `
     <tr>
       <td>${escapeHtml(categoryLabel(item.category))}</td>
       <td>${escapeHtml(item.title)}</td>
-      <td>${escapeHtml(item.qty)}</td>
-      <td>${escapeHtml(item.unit_amount)}</td>
-      <td>${escapeHtml(item.amount)}</td>
+      <td>${escapeHtml(money(item.amount, tripCur))}</td>
+      <td>${escapeHtml(money(resolveBaseMajor(item.amount, item.amount_cny, fxRate, baseCur), baseCur))}</td>
       <td>${escapeHtml(budgetStatusLabel(item.status))}</td>
       <td>${item.optional ? '是' : '否'}</td>
+      <td>${escapeHtml(quoteInLabel(item.quote_in))}</td>
       <td>${escapeHtml(item.note)}</td>
     </tr>
   `).join('');
@@ -345,7 +426,8 @@ export function buildBudgetHtml(budget) {
       <td>${escapeHtml(item.spent_on)}</td>
       <td>${escapeHtml(item.title)}</td>
       <td>${escapeHtml(item.category ? categoryLabel(item.category) : '')}</td>
-      <td>${escapeHtml(item.amount)}</td>
+      <td>${escapeHtml(money(item.amount, tripCur))}</td>
+      <td>${escapeHtml(money(resolveBaseMajor(item.amount, item.amount_cny, fxRate, baseCur), baseCur))}</td>
       <td>${escapeHtml(item.note)}</td>
     </tr>
   `).join('');
@@ -353,16 +435,16 @@ export function buildBudgetHtml(budget) {
   return `
     <div class="export-doc">
       <h1>${escapeHtml(budget.title || '预算')}</h1>
-      <p>关联出游：${escapeHtml(budget.trip?.title || '未关联')}　人数：${escapeHtml(budget.party_size || 1)}　${escapeHtml(budget.trip_currency)} → ${escapeHtml(budget.base_currency)}　汇率 ${escapeHtml(budget.fx_rate ?? 1)}</p>
-      <p>计划 ${escapeHtml(stats.planned_total_cny)} CNY　已订 ${escapeHtml(stats.booked_total_cny)} CNY　已花 ${escapeHtml(stats.spent_total_cny)} CNY　剩余 ${escapeHtml(stats.remaining_cny)} CNY</p>
+      <p>关联出游：${escapeHtml(budget.trip?.title || '未关联')}　人数：${escapeHtml(budget.party_size || 1)}　${escapeHtml(tripCur)} → ${escapeHtml(baseCur)}　汇率 ${escapeHtml(fxRate)}</p>
+      <p>计划 ${escapeHtml(money(stats.planned_total_cny, baseCur))} ${escapeHtml(baseName)}　已订 ${escapeHtml(money(stats.booked_total_cny, baseCur))} ${escapeHtml(baseName)}　已花 ${escapeHtml(money(stats.spent_total_cny, baseCur))} ${escapeHtml(baseName)}　剩余 ${escapeHtml(money(stats.remaining_cny, baseCur))} ${escapeHtml(baseName)}</p>
       <h2>预算明细</h2>
       <table>
-        <thead><tr><th>类别</th><th>项目</th><th>数量</th><th>单价</th><th>小计</th><th>状态</th><th>可选</th><th>备注</th></tr></thead>
+        <thead><tr><th>类别</th><th>项目</th><th>金额(${escapeHtml(tripName)})</th><th>本币金额(${escapeHtml(baseName)})</th><th>状态</th><th>可选</th><th>主币</th><th>备注</th></tr></thead>
         <tbody>${items}</tbody>
       </table>
       <h2>实际记账</h2>
       <table>
-        <thead><tr><th>日期</th><th>项目</th><th>类别</th><th>金额</th><th>备注</th></tr></thead>
+        <thead><tr><th>日期</th><th>项目</th><th>类别</th><th>金额(${escapeHtml(tripName)})</th><th>本币金额(${escapeHtml(baseName)})</th><th>备注</th></tr></thead>
         <tbody>${expenses}</tbody>
       </table>
     </div>
@@ -410,9 +492,8 @@ export function buildPlanHtml(trip = {}, budget = null) {
     <tr>
       <td>${escapeHtml(categoryLabel(item.category))}</td>
       <td>${escapeHtml(item.title)}</td>
-      <td class="num">${escapeHtml(item.qty)}</td>
-      <td class="num">${escapeHtml(money(item.unit_amount, fx))}</td>
       <td class="num">${escapeHtml(money(item.amount, fx))}</td>
+      <td class="num">${escapeHtml(money(resolveBaseMajor(item.amount, item.amount_cny, budget?.fx_rate, base), base))}</td>
       <td>${escapeHtml(budgetStatusLabel(item.status))}</td>
       <td>${item.optional ? '可选' : ''}</td>
     </tr>
@@ -424,32 +505,35 @@ export function buildPlanHtml(trip = {}, budget = null) {
       <td>${escapeHtml(item.title)}</td>
       <td>${escapeHtml(item.category ? categoryLabel(item.category) : '')}</td>
       <td class="num">${escapeHtml(money(item.amount, fx))}</td>
+      <td class="num">${escapeHtml(money(resolveBaseMajor(item.amount, item.amount_cny, budget?.fx_rate, base), base))}</td>
       <td>${escapeHtml(item.note || '')}</td>
     </tr>
   `).join('');
 
+  const tripName = currencyDisplayName(fx);
+  const baseName = currencyDisplayName(base);
   const budgetBlock = budget ? `
     <section class="block">
       <div class="block-head">
         <h2>预算总览</h2>
-        <p>${escapeHtml(fx)} → ${escapeHtml(base)}　汇率 ${escapeHtml(budget.fx_rate ?? 1)}${budget.fx_date ? `　${escapeHtml(budget.fx_date)}` : ''}</p>
+        <p>${escapeHtml(tripName)} → ${escapeHtml(baseName)}　汇率 ${escapeHtml(budget.fx_rate ?? 1)}${budget.fx_date ? `　${escapeHtml(budget.fx_date)}` : ''}</p>
       </div>
       <div class="stats">
-        <div class="stat"><span>计划合计</span><strong>¥${escapeHtml(money(stats.planned_total_cny, 'CNY'))}</strong><small>${escapeHtml(money(stats.planned_total, fx))} ${escapeHtml(fx)}</small></div>
-        <div class="stat"><span>已订</span><strong>¥${escapeHtml(money(stats.booked_total_cny, 'CNY'))}</strong></div>
-        <div class="stat"><span>已支出</span><strong>¥${escapeHtml(money(stats.spent_total_cny, 'CNY'))}</strong></div>
-        <div class="stat ${Number(stats.remaining_cny) < 0 ? 'over' : ''}"><span>剩余</span><strong>¥${escapeHtml(money(stats.remaining_cny, 'CNY'))}</strong></div>
+        <div class="stat"><span>计划合计</span><strong>${escapeHtml(money(stats.planned_total_cny, base))} ${escapeHtml(baseName)}</strong><small>${escapeHtml(money(stats.planned_total, fx))} ${escapeHtml(tripName)}</small></div>
+        <div class="stat"><span>已订</span><strong>${escapeHtml(money(stats.booked_total_cny, base))} ${escapeHtml(baseName)}</strong><small>${escapeHtml(money(stats.booked_total, fx))} ${escapeHtml(tripName)}</small></div>
+        <div class="stat"><span>已支出</span><strong>${escapeHtml(money(stats.spent_total_cny, base))} ${escapeHtml(baseName)}</strong><small>${escapeHtml(money(stats.spent_total, fx))} ${escapeHtml(tripName)}</small></div>
+        <div class="stat ${Number(stats.remaining_cny) < 0 ? 'over' : ''}"><span>剩余</span><strong>${escapeHtml(money(stats.remaining_cny, base))} ${escapeHtml(baseName)}</strong><small>${escapeHtml(money(stats.remaining, fx))} ${escapeHtml(tripName)}</small></div>
       </div>
       ${budget.note ? `<p class="note">${escapeHtml(budget.note)}</p>` : ''}
       <h3 class="table-title">预算明细</h3>
       <table>
-        <thead><tr><th>类别</th><th>项目</th><th>数量</th><th>单价</th><th>小计</th><th>状态</th><th></th></tr></thead>
-        <tbody>${itemRows || '<tr><td colspan="7">暂无明细</td></tr>'}</tbody>
+        <thead><tr><th>类别</th><th>项目</th><th>金额(${escapeHtml(tripName)})</th><th>本币金额(${escapeHtml(baseName)})</th><th>状态</th><th></th></tr></thead>
+        <tbody>${itemRows || '<tr><td colspan="6">暂无明细</td></tr>'}</tbody>
       </table>
       <h3 class="table-title">实际记账</h3>
       <table>
-        <thead><tr><th>日期</th><th>项目</th><th>类别</th><th>金额</th><th>备注</th></tr></thead>
-        <tbody>${expenseRows || '<tr><td colspan="5">暂无记账</td></tr>'}</tbody>
+        <thead><tr><th>日期</th><th>项目</th><th>类别</th><th>金额(${escapeHtml(tripName)})</th><th>本币金额(${escapeHtml(baseName)})</th><th>备注</th></tr></thead>
+        <tbody>${expenseRows || '<tr><td colspan="6">暂无记账</td></tr>'}</tbody>
       </table>
     </section>
   ` : '';

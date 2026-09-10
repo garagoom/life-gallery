@@ -50,6 +50,7 @@ export default defineConfig({
       'server/lib/geoCatalog.test.cjs',
       'server/lib/geoZh.test.cjs',
       'server/lib/fxCatalog.test.cjs',
+      'server/lib/tripStatus.test.cjs',
     ],
     css: { modules: { classNameStrategy: 'non-scoped' } },
     pool: 'threads',
