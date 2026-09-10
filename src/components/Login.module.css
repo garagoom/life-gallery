@@ -1,10 +1,12 @@
 .container {
   width: 100vw;
-  height: 100vh;
+  height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--bg-primary);
+  padding: 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
 }
 
 .card {
@@ -32,4 +34,14 @@
 .subtitle {
   font-size: 13px;
   color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .card {
+    padding: 24px 20px;
+  }
+
+  .header {
+    margin-bottom: 28px;
+  }
 }

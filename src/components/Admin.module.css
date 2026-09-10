@@ -16,6 +16,14 @@
   flex-shrink: 0;
 }
 
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
 .title {
   margin: 0;
   font-size: 24px;
@@ -40,6 +48,90 @@
 
 .tableWrap :global(.ant-pagination) {
   padding-right: 72px;
+}
+
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+}
+
+.card {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.cardRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.cardThumb {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.cardBody {
+  min-width: 0;
+  flex: 1;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.cardMeta {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.cardHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardActions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.cardExtra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.mobilePager {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 4px;
+  flex-shrink: 0;
 }
 
 .uploadArea {
@@ -82,7 +174,20 @@
 
 @media (max-width: 768px) {
   .container {
-    padding: 16px;
+    height: 100dvh;
+    padding: 12px 12px calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .headerActions {
+    justify-content: flex-start;
+    width: 100%;
   }
 
   .title {
@@ -91,5 +196,45 @@
 
   .searchBar {
     padding: 12px;
+  }
+
+  .searchBar :global(.ant-form-inline) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .searchBar :global(.ant-form-item) {
+    width: 100%;
+    margin-inline-end: 0 !important;
+  }
+
+  .searchBar :global(.ant-form-item-control-input),
+  .searchBar :global(.ant-input),
+  .searchBar :global(.ant-select),
+  .searchBar :global(.ant-picker) {
+    width: 100% !important;
+  }
+
+  .uploadArea,
+  .batchUploadArea {
+    padding: 24px 16px;
+  }
+
+  .listPage.container {
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .listPage .cardList {
+    flex: none;
+    overflow: visible;
+    min-height: 0;
+  }
+
+  .listPage :global(.ant-spin-nested-loading),
+  .listPage :global(.ant-spin-container) {
+    min-height: 0;
   }
 }

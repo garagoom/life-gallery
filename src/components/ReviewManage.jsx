@@ -1,17 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Button, Image, Space, Popconfirm, Tag, Select, message } from 'antd';
+import { Button, Space, Popconfirm, Tag, Select, message, Checkbox, Pagination, Spin } from 'antd';
 import { CheckOutlined, CloseOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
 import { getReviewPhotos, reviewPhoto, batchReviewPhotos } from '../api/photos';
 import { getThumbnailUrl } from '../data/photos';
 import { cachePhoto } from '../utils/imageCache';
 import { useDict } from '../contexts/DictContext';
+import useIsMobile from '../hooks/useIsMobile';
 import ListTable from './ListTable';
 import styles from './Admin.module.css';
 
 export default function ReviewManage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const mobile = useIsMobile();
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 20, total: 0 });
@@ -78,18 +80,38 @@ export default function ReviewManage() {
     setBatchLoading(false);
   };
 
+  const toggleSelect = (id) => {
+    setSelectedRowKeys((keys) => (
+      keys.includes(id) ? keys.filter((key) => key !== id) : [...keys, id]
+    ));
+  };
+
+  const reviewActions = (record) => (
+    <Space size="small">
+      <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleView(record)} />
+      {record.review_status !== 1 && (
+        <Popconfirm title="通过审核？" onConfirm={() => handleReview(record.id, 1)} okText="确定" cancelText="取消">
+          <Button type="link" size="small" icon={<CheckOutlined style={{ color: '#52c41a' }} />} />
+        </Popconfirm>
+      )}
+      {record.review_status !== 2 && (
+        <Popconfirm title="拒绝？" onConfirm={() => handleReview(record.id, 2)} okText="确定" cancelText="取消">
+          <Button type="link" size="small" danger icon={<CloseOutlined />} />
+        </Popconfirm>
+      )}
+    </Space>
+  );
+
   const columns = [
     {
       title: '照片',
       key: 'photo',
       width: 80,
       render: (_, record) => (
-        <Image
+        <img
           src={getThumbnailUrl(record)}
-          width={60}
-          height={60}
-          style={{ objectFit: 'cover', borderRadius: 4, cursor: 'pointer' }}
-          preview={false}
+          alt={record.title}
+          style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4, cursor: 'pointer' }}
           onClick={() => handleView(record)}
         />
       ),
@@ -133,68 +155,120 @@ export default function ReviewManage() {
       key: 'action',
       width: 160,
       align: 'center',
-      render: (_, record) => (
-        <Space size="small">
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleView(record)} />
-          {record.review_status !== 1 && (
-            <Popconfirm title="通过审核？" onConfirm={() => handleReview(record.id, 1)} okText="确定" cancelText="取消">
-              <Button type="link" size="small" icon={<CheckOutlined style={{ color: '#52c41a' }} />} />
-            </Popconfirm>
-          )}
-          {record.review_status !== 2 && (
-            <Popconfirm title="拒绝？" onConfirm={() => handleReview(record.id, 2)} okText="确定" cancelText="取消">
-              <Button type="link" size="small" danger icon={<CloseOutlined />} />
-            </Popconfirm>
-          )}
-        </Space>
-      ),
+      render: (_, record) => reviewActions(record),
     },
   ];
 
+  const batchButtons = selectedRowKeys.length > 0 ? [
+    <Popconfirm key="pass" title={`通过选中的 ${selectedRowKeys.length} 张照片？`} onConfirm={() => handleBatchReview(1)}>
+      <Button type="primary" icon={<CheckOutlined />} loading={batchLoading}>
+        {mobile ? `通过 (${selectedRowKeys.length})` : `批量通过 (${selectedRowKeys.length})`}
+      </Button>
+    </Popconfirm>,
+    <Popconfirm key="reject" title={`拒绝选中的 ${selectedRowKeys.length} 张照片？`} onConfirm={() => handleBatchReview(2)}>
+      <Button danger icon={<CloseOutlined />} loading={batchLoading}>
+        {mobile ? `拒绝 (${selectedRowKeys.length})` : `批量拒绝 (${selectedRowKeys.length})`}
+      </Button>
+    </Popconfirm>,
+  ] : [];
+
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${styles.listPage}`}>
       <div className={styles.header}>
         <h2 className={styles.title}>审核管理</h2>
-        <Space>
-          {selectedRowKeys.length > 0 && (
-            <>
-              <Popconfirm title={`通过选中的 ${selectedRowKeys.length} 张照片？`} onConfirm={() => handleBatchReview(1)}>
-                <Button type="primary" icon={<CheckOutlined />} loading={batchLoading}>批量通过 ({selectedRowKeys.length})</Button>
-              </Popconfirm>
-              <Popconfirm title={`拒绝选中的 ${selectedRowKeys.length} 张照片？`} onConfirm={() => handleBatchReview(2)}>
-                <Button danger icon={<CloseOutlined />} loading={batchLoading}>批量拒绝 ({selectedRowKeys.length})</Button>
-              </Popconfirm>
-            </>
+        <Space wrap className={styles.headerActions}>
+          {batchButtons}
+          {!mobile && (
+            <Select
+              value={statusFilter}
+              onChange={handleFilter}
+              placeholder="状态筛选"
+              allowClear
+              style={{ width: 130 }}
+              options={reviewStatuses.map((s) => ({ value: parseInt(s.value), label: s.label }))}
+            />
           )}
-          <Select
-            value={statusFilter}
-            onChange={handleFilter}
-            placeholder="状态筛选"
-            allowClear
-            style={{ width: 130 }}
-            options={reviewStatuses.map(s => ({ value: parseInt(s.value), label: s.label }))}
-          />
-          <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+          {!mobile && <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>}
         </Space>
       </div>
 
-      <div className={styles.tableWrap}>
-        <ListTable
-          columns={columns}
-          dataSource={photos}
-          loading={loading}
-          rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
-          pagination={{
-            current: pagination.page,
-            pageSize: pagination.pageSize,
-            total: pagination.total,
-            showSizeChanger: true,
-            showTotal: (total) => `共 ${total} 张`,
-            onChange: (page, pageSize) => loadPhotos(page, pageSize, statusFilter),
-          }}
-          scroll={{ x: 900, y: 'calc(100vh - 200px)' }}
-        />
-      </div>
+      {mobile ? (
+        <div className={styles.searchBar}>
+          <Space direction="vertical" style={{ width: '100%' }} size={8}>
+            <Select
+              value={statusFilter}
+              onChange={handleFilter}
+              placeholder="状态筛选"
+              allowClear
+              style={{ width: '100%' }}
+              options={reviewStatuses.map((s) => ({ value: parseInt(s.value), label: s.label }))}
+            />
+            <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+          </Space>
+        </div>
+      ) : null}
+
+      {mobile ? (
+        <Spin spinning={loading}>
+          <div className={styles.cardList}>
+            {photos.map((record) => (
+              <div className={styles.card} key={record.id}>
+                <div className={styles.cardRow}>
+                  <Checkbox
+                    checked={selectedRowKeys.includes(record.id)}
+                    onChange={() => toggleSelect(record.id)}
+                  />
+                  <img
+                    src={getThumbnailUrl(record)}
+                    alt={record.title}
+                    className={styles.cardThumb}
+                    onClick={() => handleView(record)}
+                  />
+                  <div className={styles.cardBody}>
+                    <h3 className={styles.cardTitle}>{record.title || '未命名'}</h3>
+                    <div className={styles.cardMeta}>
+                      {record.uploader_display_name || record.uploaded_by || '未知上传者'}
+                    </div>
+                    <div style={{ marginTop: 6 }}>
+                      <Tag color={getColor('review_status', record.review_status)}>
+                        {getLabel('review_status', record.review_status)}
+                      </Tag>
+                    </div>
+                  </div>
+                </div>
+                <div className={styles.cardActions}>{reviewActions(record)}</div>
+              </div>
+            ))}
+            {!loading && !photos.length ? <div className={styles.cardMeta}>暂无待审照片</div> : null}
+          </div>
+          <Pagination
+            className={styles.mobilePager}
+            current={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            simple
+            onChange={(page, pageSize) => loadPhotos(page, pageSize, statusFilter)}
+          />
+        </Spin>
+      ) : (
+        <div className={styles.tableWrap}>
+          <ListTable
+            columns={columns}
+            dataSource={photos}
+            loading={loading}
+            rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
+            pagination={{
+              current: pagination.page,
+              pageSize: pagination.pageSize,
+              total: pagination.total,
+              showSizeChanger: true,
+              showTotal: (total) => `共 ${total} 张`,
+              onChange: (page, pageSize) => loadPhotos(page, pageSize, statusFilter),
+            }}
+            scroll={{ x: 900, y: 'calc(100vh - 200px)' }}
+          />
+        </div>
+      )}
     </div>
   );
 }

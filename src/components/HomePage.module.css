@@ -1,11 +1,11 @@
 .container {
-  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px 100px;
+  padding: 40px 20px calc(88px + env(safe-area-inset-bottom, 0px));
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;

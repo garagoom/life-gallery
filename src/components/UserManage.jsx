@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Button, Modal, Form, Input, Select, Switch, Space, Popconfirm, Tag, Avatar, message } from 'antd';
+import { Button, Modal, Form, Input, Select, Switch, Space, Popconfirm, Tag, Avatar, message, Pagination, Spin } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined } from '@ant-design/icons';
 import { getUsers, createUser, updateUser, updateUserStatus, deleteUser } from '../api/users';
 import { useAuth } from '../contexts/AuthContext';
 import { useDict } from '../contexts/DictContext';
+import useIsMobile from '../hooks/useIsMobile';
 import ListTable from './ListTable';
 import styles from './Admin.module.css';
 
 export default function UserManage() {
+  const mobile = useIsMobile();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 20, total: 0 });
@@ -124,6 +126,30 @@ export default function UserManage() {
   const roles = getDict('role');
   const genders = getDict('gender');
 
+  const roleList = (record) => (record.roles?.length ? record.roles : (record.role ? [record.role] : []));
+
+  const userActions = (record) => (
+    <Space size="small">
+      <Button
+        type="link"
+        size="small"
+        icon={<EditOutlined style={{ color: 'var(--accent)' }} />}
+        onClick={() => handleEdit(record)}
+      />
+      {record.id !== currentUser?.id && record.username !== 'admin' && (
+        <Popconfirm
+          title="确定删除此用户？"
+          onConfirm={() => handleDelete(record.id)}
+          okText="确定"
+          cancelText="取消"
+          okButtonProps={{ loading: deletingId === record.id }}
+        >
+          <Button type="link" size="small" danger icon={<DeleteOutlined />} />
+        </Popconfirm>
+      )}
+    </Space>
+  );
+
   const columns = [
     {
       title: '用户',
@@ -170,7 +196,7 @@ export default function UserManage() {
       key: 'roles',
       width: 220,
       render: (roles, record) => {
-        const list = roles?.length ? roles : (record.role ? [record.role] : []);
+        const list = roleList(record);
         return (
           <Space size={[4, 4]} wrap>
             {list.map((role) => (
@@ -203,55 +229,84 @@ export default function UserManage() {
       width: 108,
       fixed: 'right',
       align: 'center',
-      render: (_, record) => (
-        <Space size="small">
-          <Button
-            type="link"
-            size="small"
-            icon={<EditOutlined style={{ color: 'var(--accent)' }} />}
-            onClick={() => handleEdit(record)}
-          />
-          {record.id !== currentUser?.id && record.username !== 'admin' && (
-            <Popconfirm
-              title="确定删除此用户？"
-              onConfirm={() => handleDelete(record.id)}
-              okText="确定"
-              cancelText="取消"
-              okButtonProps={{ loading: deletingId === record.id }}
-            >
-              <Button type="link" size="small" danger icon={<DeleteOutlined />} />
-            </Popconfirm>
-          )}
-        </Space>
-      ),
+      render: (_, record) => userActions(record),
     },
   ];
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${styles.listPage}`}>
       <div className={styles.header}>
         <h2 className={styles.title}>用户管理</h2>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-          添加用户
+          {mobile ? '添加' : '添加用户'}
         </Button>
       </div>
 
-      <div className={styles.tableWrap}>
-        <ListTable
-          columns={columns}
-          dataSource={users}
-          loading={loading}
-          scroll={{ x: 1120, y: 'calc(100vh - 160px)' }}
-          pagination={{
-            current: pagination.page,
-            pageSize: pagination.pageSize,
-            total: pagination.total,
-            showSizeChanger: true,
-            showTotal: (total) => `共 ${total} 个用户`,
-            onChange: (page, pageSize) => loadUsers(page, pageSize),
-          }}
-        />
-      </div>
+      {mobile ? (
+        <Spin spinning={loading}>
+          <div className={styles.cardList}>
+            {users.map((record) => (
+              <div className={styles.card} key={record.id}>
+                <div className={styles.cardRow}>
+                  <Avatar src={record.avatar} icon={<UserOutlined />} size={44} style={{ flexShrink: 0 }} />
+                  <div className={styles.cardBody}>
+                    <h3 className={styles.cardTitle}>{record.display_name || record.username}</h3>
+                    <div className={styles.cardMeta}>@{record.username}</div>
+                    <div className={styles.cardMeta}>
+                      {[record.email, record.gender ? getLabel('gender', record.gender) : null].filter(Boolean).join(' · ') || '未填写邮箱'}
+                    </div>
+                    {record.bio ? <div className={styles.cardMeta}>{record.bio}</div> : null}
+                    <div style={{ marginTop: 6 }}>
+                      <Space size={[4, 4]} wrap>
+                        {roleList(record).map((role) => (
+                          <Tag key={role} color={getColor('role', role)}>{getLabel('role', role)}</Tag>
+                        ))}
+                      </Space>
+                    </div>
+                  </div>
+                </div>
+                <div className={styles.cardExtra}>
+                  <Switch
+                    checked={record.status === 1}
+                    onChange={(checked) => handleStatusChange(record.id, checked)}
+                    disabled={record.id === currentUser?.id || record.username === 'admin' || statusLoadingId === record.id}
+                    loading={statusLoadingId === record.id}
+                    checkedChildren="启用"
+                    unCheckedChildren="禁用"
+                  />
+                  {userActions(record)}
+                </div>
+              </div>
+            ))}
+            {!loading && !users.length ? <div className={styles.cardMeta}>暂无用户</div> : null}
+          </div>
+          <Pagination
+            className={styles.mobilePager}
+            current={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            simple
+            onChange={(page, pageSize) => loadUsers(page, pageSize)}
+          />
+        </Spin>
+      ) : (
+        <div className={styles.tableWrap}>
+          <ListTable
+            columns={columns}
+            dataSource={users}
+            loading={loading}
+            scroll={{ x: 1120, y: 'calc(100vh - 160px)' }}
+            pagination={{
+              current: pagination.page,
+              pageSize: pagination.pageSize,
+              total: pagination.total,
+              showSizeChanger: true,
+              showTotal: (total) => `共 ${total} 个用户`,
+              onChange: (page, pageSize) => loadUsers(page, pageSize),
+            }}
+          />
+        </div>
+      )}
 
       <Modal
         title={editingUser ? '编辑用户' : '添加用户'}
@@ -261,7 +316,8 @@ export default function UserManage() {
         okText="确定"
         cancelText="取消"
         confirmLoading={submitting}
-        width={480}
+        width={mobile ? 'calc(100vw - 24px)' : 480}
+        styles={mobile ? { body: { maxHeight: '70dvh', overflow: 'auto' } } : undefined}
       >
         <Form
           form={form}

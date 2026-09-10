@@ -18,10 +18,6 @@
   transition: transform 0.3s ease;
 }
 
-.photoItem:hover {
-  transform: scale(1.02);
-}
-
 .photo {
   display: block;
   width: 100%;
@@ -41,13 +37,27 @@
   right: 0;
   padding: 52px 14px 14px;
   background: linear-gradient(to top, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.62) 48%, transparent 100%);
-  opacity: 0;
+  opacity: 1;
   transition: opacity 0.3s ease;
   pointer-events: none;
 }
 
-.photoItem:hover .overlay {
-  opacity: 1;
+.photoItem:hover {
+  transform: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .overlay {
+    opacity: 0;
+  }
+
+  .photoItem:hover {
+    transform: scale(1.02);
+  }
+
+  .photoItem:hover .overlay {
+    opacity: 1;
+  }
 }
 
 .overlayInfo {

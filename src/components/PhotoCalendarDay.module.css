@@ -3,7 +3,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 28px 24px 96px;
+  padding: 28px 24px calc(96px + env(safe-area-inset-bottom, 0px));
   background: var(--bg-primary);
 }
 
@@ -209,13 +209,13 @@
   letter-spacing: 0.04em;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .page {
-    padding: 16px 10px 96px;
+    padding: 16px 10px calc(96px + env(safe-area-inset-bottom, 0px));
   }
 
   .title {
-    font-size: 28px;
+    font-size: 24px;
   }
 
   .slide {

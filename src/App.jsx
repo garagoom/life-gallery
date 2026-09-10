@@ -71,7 +71,7 @@ function AppRoutes({ handlePhotosLoaded, handlePhotoClick, isPaused, photos }) {
         } />
         <Route path="/photography/portfolio" element={
           <ProtectedRoute>
-            <div style={{ height: '100%', overflow: 'auto', paddingBottom: '80px' }}>
+            <div style={{ height: '100%', overflow: 'auto', paddingBottom: 'calc(88px + env(safe-area-inset-bottom, 0px))' }}>
               <Portfolio />
             </div>
           </ProtectedRoute>

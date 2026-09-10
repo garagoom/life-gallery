@@ -1,12 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { Modal } from 'antd';
+import useIsMobile from '../hooks/useIsMobile';
 
 export default function AvatarCropper({ open, imageSrc, onCrop, onCancel }) {
+  const mobile = useIsMobile();
   const canvasRef = useRef(null);
   const imgRef = useRef(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
+  const draggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
 
   const draw = (z, o) => {
@@ -43,19 +46,26 @@ export default function AvatarCropper({ open, imageSrc, onCrop, onCancel }) {
 
   useEffect(() => { draw(zoom, offset); }, [zoom, offset]);
 
-  const handleMouseDown = (e) => {
+  const handlePointerDown = (e) => {
     e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    draggingRef.current = true;
     setDragging(true);
     dragStartRef.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
   };
 
-  const handleMouseMove = (e) => {
-    if (!dragging) return;
-    const newOffset = { x: e.clientX - dragStartRef.current.x, y: e.clientY - dragStartRef.current.y };
-    setOffset(newOffset);
+  const handlePointerMove = (e) => {
+    if (!draggingRef.current) return;
+    setOffset({ x: e.clientX - dragStartRef.current.x, y: e.clientY - dragStartRef.current.y });
   };
 
-  const handleMouseUp = () => setDragging(false);
+  const handlePointerUp = (e) => {
+    draggingRef.current = false;
+    setDragging(false);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  };
 
   const handleOk = () => {
     const canvas = canvasRef.current;
@@ -73,20 +83,26 @@ export default function AvatarCropper({ open, imageSrc, onCrop, onCancel }) {
       onCancel={onCancel}
       okText="确定"
       cancelText="取消"
-      width={360}
+      width={mobile ? 'calc(100vw - 24px)' : 360}
       destroyOnClose
     >
       <div style={{
-        width: 256, height: 256, margin: '0 auto', borderRadius: '50%',
-        overflow: 'hidden', background: '#000', cursor: dragging ? 'grabbing' : 'grab',
+        width: 'min(256px, 100%)',
+        aspectRatio: '1',
+        margin: '0 auto',
+        borderRadius: '50%',
+        overflow: 'hidden',
+        background: '#000',
+        cursor: dragging ? 'grabbing' : 'grab',
         border: '3px solid var(--border)',
+        touchAction: 'none',
       }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
       >
-        <canvas ref={canvasRef} style={{ width: 256, height: 256, display: 'block' }} />
+        <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
       </div>
       <div style={{ marginTop: 12, textAlign: 'center' }}>
         <span style={{ fontSize: 12, color: 'var(--text-secondary)', marginRight: 8 }}>缩放</span>
@@ -97,7 +113,7 @@ export default function AvatarCropper({ open, imageSrc, onCrop, onCancel }) {
           step={0.05}
           value={zoom}
           onChange={(e) => setZoom(Number(e.target.value))}
-          style={{ width: 180, verticalAlign: 'middle' }}
+          style={{ width: mobile ? '70%' : 180, verticalAlign: 'middle' }}
         />
       </div>
       <div style={{ marginTop: 8, textAlign: 'center', fontSize: 12, color: 'var(--text-secondary)' }}>

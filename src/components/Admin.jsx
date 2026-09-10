@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Button, Modal, Form, Input, Select, Upload, Image, Space, Popconfirm, message, Progress, DatePicker, ConfigProvider, Switch } from 'antd';
+import { Button, Modal, Form, Input, Image, Space, Popconfirm, message, Progress, DatePicker, ConfigProvider, Switch, Checkbox, Pagination, Spin } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, FolderOpenOutlined, SearchOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
 import zhCN from 'antd/locale/zh_CN';
 import dayjs from 'dayjs';
@@ -9,12 +9,14 @@ import { getThumbnailUrl } from '../data/photos';
 import { cachePhoto } from '../utils/imageCache';
 import { isImageFile } from '../utils/isImageFile';
 import { useDict } from '../contexts/DictContext';
+import useIsMobile from '../hooks/useIsMobile';
 import ListTable from './ListTable';
 import styles from './Admin.module.css';
 
 export default function Admin() {
   const navigate = useNavigate();
   const location = useLocation();
+  const mobile = useIsMobile();
   const { getColor, getLabel } = useDict();
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -284,6 +286,45 @@ export default function Admin() {
     }
   };
 
+  const toggleSelect = (id) => {
+    setSelectedRowKeys((keys) => (
+      keys.includes(id) ? keys.filter((key) => key !== id) : [...keys, id]
+    ));
+  };
+
+  const reviewColor = (record) => {
+    const colorMap = { orange: '#fa8c16', green: '#52c41a', red: '#ff4d4f' };
+    const color = getColor('review_status', record.review_status);
+    return colorMap[color] || undefined;
+  };
+
+  const cameraText = (record) => record.camera_model || record.camera_make || '';
+
+  const settingsText = (record) => {
+    const parts = [];
+    if (record.f_number) parts.push(record.f_number);
+    if (record.exposure_time) parts.push(record.exposure_time);
+    if (record.iso) parts.push(record.iso);
+    if (record.focal_length) parts.push(record.focal_length);
+    return parts.join(' | ');
+  };
+
+  const photoActions = (record) => (
+    <Space>
+      <Button type="link" icon={<EyeOutlined />} onClick={() => handleView(record)} />
+      <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
+      <Popconfirm
+        title="确定删除这张照片？"
+        onConfirm={() => handleDelete(record.id)}
+        okText="确定"
+        cancelText="取消"
+        okButtonProps={{ loading: deletingId === record.id }}
+      >
+        <Button type="link" danger icon={<DeleteOutlined />} />
+      </Popconfirm>
+    </Space>
+  );
+
   const columns = [
     {
       title: '照片',
@@ -318,35 +359,21 @@ export default function Admin() {
       title: '相机',
       key: 'camera',
       width: 200,
-      render: (_, record) => {
-        if (record.camera_make || record.camera_model) {
-          return record.camera_model || record.camera_make || '';
-        }
-        return '-';
-      },
+      render: (_, record) => cameraText(record) || '-',
     },
     {
       title: '参数',
       key: 'settings',
       width: 240,
-      render: (_, record) => {
-        const parts = [];
-        if (record.f_number) parts.push(record.f_number);
-        if (record.exposure_time) parts.push(record.exposure_time);
-        if (record.iso) parts.push(record.iso);
-        if (record.focal_length) parts.push(record.focal_length);
-        return parts.length > 0 ? parts.join(' | ') : '-';
-      },
+      render: (_, record) => settingsText(record) || '-',
     },
     {
       title: '审核',
       key: 'review_status',
       width: 88,
-      render: (_, record) => {
-        const colorMap = { orange: '#fa8c16', green: '#52c41a', red: '#ff4d4f' };
-        const color = getColor('review_status', record.review_status);
-        return <span style={{ color: colorMap[color] || undefined, fontWeight: 500 }}>{getLabel('review_status', record.review_status)}</span>;
-      },
+      render: (_, record) => (
+        <span style={{ color: reviewColor(record), fontWeight: 500 }}>{getLabel('review_status', record.review_status)}</span>
+      ),
     },
     {
       title: '展示',
@@ -368,38 +395,18 @@ export default function Admin() {
       title: '操作',
       key: 'action',
       width: 140,
-      render: (_, record) => (
-        <Space>
-          <Button
-            type="link"
-            icon={<EyeOutlined />}
-            onClick={() => handleView(record)}
-          />
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          />
-          <Popconfirm
-            title="确定删除这张照片？"
-            onConfirm={() => handleDelete(record.id)}
-            okText="确定"
-            cancelText="取消"
-            okButtonProps={{ loading: deletingId === record.id }}
-          >
-            <Button type="link" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
-        </Space>
-      ),
+      render: (_, record) => photoActions(record),
     },
   ];
 
+  const modalWidth = (desktop) => (mobile ? 'calc(100vw - 24px)' : desktop);
+
   return (
     <ConfigProvider locale={zhCN}>
-      <div className={styles.container}>
+      <div className={`${styles.container} ${styles.listPage}`}>
         <div className={styles.header}>
           <h2 className={styles.title}>照片管理</h2>
-          <Space>
+          <Space wrap className={styles.headerActions}>
             {selectedRowKeys.length > 0 && (
               <Popconfirm
                 title={`确定删除选中的 ${selectedRowKeys.length} 张照片？`}
@@ -410,36 +417,35 @@ export default function Admin() {
                 okButtonProps={{ loading: batchDeleting }}
               >
                 <Button danger icon={<DeleteOutlined />}>
-                  批量删除 ({selectedRowKeys.length})
+                  {mobile ? `删除 (${selectedRowKeys.length})` : `批量删除 (${selectedRowKeys.length})`}
                 </Button>
               </Popconfirm>
             )}
             <Button icon={<FolderOpenOutlined />} onClick={handleBatchUpload}>
-              批量上传
+              {mobile ? '批量' : '批量上传'}
             </Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-              添加照片
+              {mobile ? '添加' : '添加照片'}
             </Button>
           </Space>
         </div>
 
-        {/* Search Filters */}
         <div className={styles.searchBar}>
           <Form
             form={searchForm}
             layout="inline"
             onFinish={handleSearch}
-            style={{ flexWrap: 'wrap', gap: '8px' }}
+            style={{ flexWrap: 'wrap', gap: 8 }}
           >
             <Form.Item name="title" style={{ marginBottom: 0 }}>
-              <Input 
-                placeholder="搜索标题" 
-                style={{ width: 150 }}
+              <Input
+                placeholder="搜索标题"
+                style={{ width: mobile ? '100%' : 150 }}
                 allowClear
               />
             </Form.Item>
             <Form.Item name="dateRange" style={{ marginBottom: 0 }}>
-              <DatePicker.RangePicker style={{ width: 240 }} />
+              <DatePicker.RangePicker style={{ width: mobile ? '100%' : 240 }} inputReadOnly={mobile} />
             </Form.Item>
             <Form.Item style={{ marginBottom: 0 }}>
               <Space>
@@ -454,35 +460,88 @@ export default function Admin() {
           </Form>
         </div>
 
-        <div className={styles.tableWrap}>
-          <ListTable
-            columns={columns}
-            dataSource={photos}
-            loading={loading}
-            rowSelection={{
-              selectedRowKeys,
-              onChange: setSelectedRowKeys,
-            }}
-            pagination={{
-              current: pagination.page,
-              pageSize: pagination.pageSize,
-              total: pagination.total,
-              showSizeChanger: true,
-              showQuickJumper: true,
-              showTotal: (total) => `共 ${total} 张照片`,
-              pageSizeOptions: ['10', '20', '50'],
-              sizeChangerText: '条/页',
-              quickGoText: '跳至',
-              itemRender: (current, type, originalElement) => {
-                if (type === 'prev') return <a>上一页</a>;
-                if (type === 'next') return <a>下一页</a>;
-                return originalElement;
-              },
-            }}
-            onChange={handleTableChange}
-            scroll={{ x: 1220, y: 'calc(100vh - 280px)' }}
-          />
-        </div>
+        {mobile ? (
+          <Spin spinning={loading}>
+            <div className={styles.cardList}>
+              {photos.map((record) => (
+                <div className={styles.card} key={record.id}>
+                  <div className={styles.cardRow}>
+                    <Checkbox
+                      checked={selectedRowKeys.includes(record.id)}
+                      onChange={() => toggleSelect(record.id)}
+                    />
+                    <img
+                      src={getThumbnailUrl(record)}
+                      alt={record.title}
+                      className={styles.cardThumb}
+                      onClick={() => handleView(record)}
+                    />
+                    <div className={styles.cardBody}>
+                      <h3 className={styles.cardTitle}>{record.title || '未命名'}</h3>
+                      <div className={styles.cardMeta}>
+                        {[record.date, cameraText(record)].filter(Boolean).join(' · ') || '无日期'}
+                      </div>
+                      {settingsText(record) ? <div className={styles.cardMeta}>{settingsText(record)}</div> : null}
+                    </div>
+                  </div>
+                  <div className={styles.cardExtra}>
+                    <span style={{ color: reviewColor(record), fontWeight: 500, fontSize: 13 }}>
+                      {getLabel('review_status', record.review_status)}
+                    </span>
+                    <Switch
+                      size="small"
+                      checked={Number(record.is_public) !== 0}
+                      loading={visibilitySavingId === record.id}
+                      checkedChildren="公开"
+                      unCheckedChildren="私密"
+                      onChange={(checked) => handleVisibilityChange(record, checked)}
+                    />
+                  </div>
+                  <div className={styles.cardActions}>{photoActions(record)}</div>
+                </div>
+              ))}
+              {!loading && !photos.length ? <div className={styles.cardMeta}>暂无照片</div> : null}
+            </div>
+            <Pagination
+              className={styles.mobilePager}
+              current={pagination.page}
+              pageSize={pagination.pageSize}
+              total={pagination.total}
+              simple
+              onChange={(page, pageSize) => loadPhotos(page, pageSize, searchParams)}
+            />
+          </Spin>
+        ) : (
+          <div className={styles.tableWrap}>
+            <ListTable
+              columns={columns}
+              dataSource={photos}
+              loading={loading}
+              rowSelection={{
+                selectedRowKeys,
+                onChange: setSelectedRowKeys,
+              }}
+              pagination={{
+                current: pagination.page,
+                pageSize: pagination.pageSize,
+                total: pagination.total,
+                showSizeChanger: true,
+                showQuickJumper: true,
+                showTotal: (total) => `共 ${total} 张照片`,
+                pageSizeOptions: ['10', '20', '50'],
+                sizeChangerText: '条/页',
+                quickGoText: '跳至',
+                itemRender: (current, type, originalElement) => {
+                  if (type === 'prev') return <a>上一页</a>;
+                  if (type === 'next') return <a>下一页</a>;
+                  return originalElement;
+                },
+              }}
+              onChange={handleTableChange}
+              scroll={{ x: 1220, y: 'calc(100vh - 280px)' }}
+            />
+          </div>
+        )}
 
         {/* Single Upload Modal */}
         <Modal
@@ -497,7 +556,7 @@ export default function Admin() {
           okText="确定"
           cancelText="取消"
           confirmLoading={submitting}
-          width={480}
+          width={modalWidth(480)}
         >
           <Form
             form={form}
@@ -556,8 +615,8 @@ export default function Admin() {
               <Form.Item label="当前照片">
                 <Image
                   src={getThumbnailUrl(editingPhoto)}
-                  width={200}
-                  style={{ borderRadius: 8 }}
+                  width={mobile ? '100%' : 200}
+                  style={{ borderRadius: 8, maxWidth: 200 }}
                 />
               </Form.Item>
             )}
@@ -568,7 +627,7 @@ export default function Admin() {
 
             <div style={{ display: 'flex', gap: 12 }}>
               <Form.Item name="date" label="日期" style={{ flex: 1 }}>
-                <DatePicker style={{ width: '100%' }} placeholder="选择日期" />
+                <DatePicker style={{ width: '100%' }} placeholder="选择日期" inputReadOnly={mobile} />
               </Form.Item>
             </div>
           </Form>
@@ -583,7 +642,7 @@ export default function Admin() {
           okText="开始上传"
           cancelText="取消"
           confirmLoading={batchUploading}
-          width={520}
+          width={modalWidth(520)}
         >
           <div style={{ marginTop: 24 }}>
             <div 

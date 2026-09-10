@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Button, Modal, Form, Input, InputNumber, Switch, Space, message, Popconfirm, Tree, Empty } from 'antd';
+import { Button, Modal, Form, Input, InputNumber, Switch, Space, message, Popconfirm, Tree, Empty, Spin } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { getAllMenus } from '../api/menus';
 import { getRoles, getRole, createRole, updateRole, deleteRole } from '../api/roles';
@@ -13,10 +13,12 @@ import {
   buildRoleTreeData,
   splitRoleCheckedKeys,
 } from '../constants/dataPermissions';
+import useIsMobile from '../hooks/useIsMobile';
 import ListTable from './ListTable';
 import styles from './Admin.module.css';
 
 export default function RoleManage() {
+  const mobile = useIsMobile();
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -129,6 +131,17 @@ export default function RoleManage() {
     }
   };
 
+  const roleActions = (record) => (
+    <Space size="small">
+      <Button type="link" size="small" icon={<EditOutlined style={{ color: 'var(--accent)' }} />} onClick={() => handleEdit(record)} />
+      {record.name !== 'admin' && (
+        <Popconfirm title="确定删除?" onConfirm={() => handleDelete(record.id)} okButtonProps={{ loading: deletingId === record.id }}>
+          <Button type="link" size="small" danger icon={<DeleteOutlined />} />
+        </Popconfirm>
+      )}
+    </Space>
+  );
+
   const columns = [
     {
       title: 'ID',
@@ -171,16 +184,7 @@ export default function RoleManage() {
       width: 108,
       fixed: 'right',
       align: 'center',
-      render: (_, record) => (
-        <Space size="small">
-          <Button type="link" size="small" icon={<EditOutlined style={{ color: 'var(--accent)' }} />} onClick={() => handleEdit(record)} />
-          {record.name !== 'admin' && (
-            <Popconfirm title="确定删除?" onConfirm={() => handleDelete(record.id)} okButtonProps={{ loading: deletingId === record.id }}>
-              <Button type="link" size="small" danger icon={<DeleteOutlined />} />
-            </Popconfirm>
-          )}
-        </Space>
-      ),
+      render: (_, record) => roleActions(record),
     },
   ];
 
@@ -188,14 +192,32 @@ export default function RoleManage() {
   const isAdminRole = editingRole?.name === 'admin';
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${styles.listPage}`}>
       <div className={styles.header}>
         <h2 className={styles.title}>角色管理</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新建角色</Button>
+        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>{mobile ? '新建' : '新建角色'}</Button>
       </div>
-      <div className={styles.tableWrap}>
-        <ListTable columns={columns} dataSource={roles} loading={loading} pagination={false} scroll={{ x: 720, y: 'calc(100vh - 160px)' }} />
-      </div>
+      {mobile ? (
+        <Spin spinning={loading}>
+          <div className={styles.cardList}>
+            {roles.map((record) => (
+              <div className={styles.card} key={record.id}>
+                <div className={styles.cardHead}>
+                  <h3 className={styles.cardTitle}>{record.label}</h3>
+                  <Switch checked={record.status === 1} disabled size="small" />
+                </div>
+                <div className={styles.cardMeta}>{record.name} · {record.user_count || 0} 人</div>
+                <div className={styles.cardActions}>{roleActions(record)}</div>
+              </div>
+            ))}
+            {!loading && !roles.length ? <div className={styles.cardMeta}>暂无角色</div> : null}
+          </div>
+        </Spin>
+      ) : (
+        <div className={styles.tableWrap}>
+          <ListTable columns={columns} dataSource={roles} loading={loading} pagination={false} scroll={{ x: 720, y: 'calc(100vh - 160px)' }} />
+        </div>
+      )}
 
       <Modal
         title={editingRole ? '编辑角色' : '新建角色'}
@@ -205,7 +227,8 @@ export default function RoleManage() {
         okText="确定"
         cancelText="取消"
         confirmLoading={submitting}
-        width={560}
+        width={mobile ? 'calc(100vw - 24px)' : 560}
+        styles={mobile ? { body: { maxHeight: '70dvh', overflow: 'auto' } } : undefined}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 24 }}>
           <Form.Item name="name" label="角色名" rules={[{ required: true, message: '请输入角色名' }]}>
@@ -222,7 +245,7 @@ export default function RoleManage() {
             extra="勾选菜单/按钮表示有操作权；其下「数据」勾选为全站，不勾选只操作自己的数据"
           >
             {treeData.length > 0 ? (
-              <div style={{ border: '1px solid #d9d9d9', borderRadius: 6, padding: 8, maxHeight: 360, overflow: 'auto' }}>
+              <div style={{ border: '1px solid var(--border)', borderRadius: 6, padding: 8, maxHeight: mobile ? '40dvh' : 360, overflow: 'auto' }}>
                 <Tree
                   checkable
                   checkStrictly

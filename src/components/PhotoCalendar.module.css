@@ -3,7 +3,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 28px 32px 96px;
+  padding: 28px 32px calc(96px + env(safe-area-inset-bottom, 0px));
   background: var(--bg-primary);
 }
 
@@ -286,13 +286,13 @@
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .studio {
-    padding: 16px 14px 96px;
+    padding: 16px 14px calc(96px + env(safe-area-inset-bottom, 0px));
   }
 
   .title {
-    font-size: 32px;
+    font-size: 24px;
   }
 
   .card {
@@ -301,7 +301,7 @@
   }
 
   .grid {
-    gap: 6px;
+    gap: 4px;
   }
 
   .tile {
@@ -310,5 +310,9 @@
 
   .dateNum {
     font-size: 12px;
+  }
+
+  .weekday {
+    font-size: 11px;
   }
 }

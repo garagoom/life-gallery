@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Button, Modal, Form, Input, InputNumber, Select, Space, message, Popconfirm, Switch } from 'antd';
+import { Button, Modal, Form, Input, InputNumber, Select, Space, message, Popconfirm, Switch, Spin } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { getAllMenus, createMenu, updateMenu, deleteMenu } from '../api/menus';
 import { useDict } from '../contexts/DictContext';
 import { iconList, getIcon } from '../utils/icons';
+import useIsMobile from '../hooks/useIsMobile';
 import ListTable from './ListTable';
 import styles from './Admin.module.css';
 
@@ -26,6 +27,14 @@ function collectExpandKeys(nodes, acc = []) {
   return acc;
 }
 
+function flattenWithDepth(nodes, depth = 0, acc = []) {
+  (nodes || []).forEach((node) => {
+    acc.push({ ...node, depth });
+    if (node.children?.length) flattenWithDepth(node.children, depth + 1, acc);
+  });
+  return acc;
+}
+
 function flattenMenus(nodes, acc = []) {
   (nodes || []).forEach((node) => {
     acc.push(node);
@@ -35,6 +44,7 @@ function flattenMenus(nodes, acc = []) {
 }
 
 export default function MenuManage() {
+  const mobile = useIsMobile();
   const [menus, setMenus] = useState([]);
   const [expandedKeys, setExpandedKeys] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -110,6 +120,21 @@ export default function MenuManage() {
     }
   };
 
+  const typeLabel = (val) => {
+    const item = menuTypeDict.find((d) => d.value === val);
+    return item ? <span style={{ color: `var(--${item.color})` }}>{item.label}</span> : val;
+  };
+
+  const menuActions = (record) => (
+    <Space size="small">
+      <Button type="link" size="small" icon={<PlusOutlined style={{ color: 'var(--accent)' }} />} onClick={() => handleAdd(record.id)} title="添加子菜单" />
+      <Button type="link" size="small" icon={<EditOutlined style={{ color: 'var(--accent)' }} />} onClick={() => handleEdit(record)} />
+      <Popconfirm title="确定删除?" onConfirm={() => handleDelete(record.id)} okButtonProps={{ loading: deletingId === record.id }}>
+        <Button type="link" size="small" danger icon={<DeleteOutlined />} />
+      </Popconfirm>
+    </Space>
+  );
+
   const columns = [
     {
       title: 'Key',
@@ -130,10 +155,7 @@ export default function MenuManage() {
       key: 'type',
       width: 80,
       align: 'center',
-      render: (val) => {
-        const item = menuTypeDict.find(d => d.value === val);
-        return item ? <span style={{ color: `var(--${item.color})` }}>{item.label}</span> : val;
-      },
+      render: (val) => typeLabel(val),
     },
     {
       title: '可见',
@@ -178,38 +200,51 @@ export default function MenuManage() {
       width: 140,
       fixed: 'right',
       align: 'center',
-      render: (_, record) => (
-        <Space size="small">
-          <Button type="link" size="small" icon={<PlusOutlined style={{ color: 'var(--accent)' }} />} onClick={() => handleAdd(record.id)} title="添加子菜单" />
-          <Button type="link" size="small" icon={<EditOutlined style={{ color: 'var(--accent)' }} />} onClick={() => handleEdit(record)} />
-          <Popconfirm title="确定删除?" onConfirm={() => handleDelete(record.id)} okButtonProps={{ loading: deletingId === record.id }}>
-            <Button type="link" size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
-        </Space>
-      ),
+      render: (_, record) => menuActions(record),
     },
   ];
 
+  const flatMenus = flattenWithDepth(menus);
+
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${styles.listPage}`}>
       <div className={styles.header}>
         <h2 className={styles.title}>菜单管理</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => handleAdd()}>新建菜单</Button>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => handleAdd()}>{mobile ? '新建' : '新建菜单'}</Button>
       </div>
-      <div className={styles.tableWrap}>
-        <ListTable
-          columns={columns}
-          dataSource={menus}
-          loading={loading}
-          pagination={false}
-          scroll={{ x: 1000, y: 'calc(100vh - 160px)' }}
-          childrenColumnName="children"
-          expandable={{
-            expandedRowKeys: expandedKeys,
-            onExpandedRowsChange: setExpandedKeys,
-          }}
-        />
-      </div>
+      {mobile ? (
+        <Spin spinning={loading}>
+          <div className={styles.cardList}>
+            {flatMenus.map((record) => (
+              <div className={styles.card} key={record.id} style={{ marginLeft: record.depth * 12 }}>
+                <div className={styles.cardHead}>
+                  <h3 className={styles.cardTitle}>{record.label}</h3>
+                  {typeLabel(record.type)}
+                </div>
+                <div className={styles.cardMeta}>{record.menuKey}</div>
+                {record.path ? <div className={styles.cardMeta}>{record.path}</div> : null}
+                <div className={styles.cardActions}>{menuActions(record)}</div>
+              </div>
+            ))}
+            {!loading && !flatMenus.length ? <div className={styles.cardMeta}>暂无菜单</div> : null}
+          </div>
+        </Spin>
+      ) : (
+        <div className={styles.tableWrap}>
+          <ListTable
+            columns={columns}
+            dataSource={menus}
+            loading={loading}
+            pagination={false}
+            scroll={{ x: 1000, y: 'calc(100vh - 160px)' }}
+            childrenColumnName="children"
+            expandable={{
+              expandedRowKeys: expandedKeys,
+              onExpandedRowsChange: setExpandedKeys,
+            }}
+          />
+        </div>
+      )}
 
       <Modal
         title={editingMenu ? '编辑菜单' : '新建菜单'}
@@ -219,6 +254,8 @@ export default function MenuManage() {
         okText="确定"
         cancelText="取消"
         confirmLoading={submitting}
+        width={mobile ? 'calc(100vw - 24px)' : 520}
+        styles={mobile ? { body: { maxHeight: '70dvh', overflow: 'auto' } } : undefined}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 24 }}>
           <Form.Item name="parent_id" label="上级菜单">

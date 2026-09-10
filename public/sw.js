@@ -1,5 +1,5 @@
 const IMAGE_CACHE = 'life-gallery-images-v2';
-const STATIC_CACHE = 'life-gallery-static-v3';
+const STATIC_CACHE = 'life-gallery-static-v4';
 const IMAGE_CACHE_LIMIT = 80;
 
 self.addEventListener('install', () => self.skipWaiting());
