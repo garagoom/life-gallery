@@ -48,7 +48,7 @@ export default defineConfig({
     include: [
       'src/**/*.{test,spec}.{js,jsx}',
       'server/lib/geoCatalog.test.cjs',
-      'server/lib/geoLookup.test.cjs',
+      'server/lib/geoZh.test.cjs',
       'server/lib/fxCatalog.test.cjs',
     ],
     css: { modules: { classNameStrategy: 'non-scoped' } },

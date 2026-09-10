@@ -2,8 +2,6 @@ import { request, API_BASE } from './client';
 
 const cache = {
   countries: null,
-  states: new Map(),
-  cities: new Map(),
 };
 
 export function joinDestination(paths = []) {
@@ -28,26 +26,11 @@ export async function getCountries() {
   return cache.countries;
 }
 
-export async function getStates(countryCode) {
-  const key = String(countryCode || '').toUpperCase();
-  if (cache.states.has(key)) return cache.states.get(key);
-  const result = await request(`${API_BASE}/geo/states?country=${encodeURIComponent(key)}`);
-  const states = result.data || [];
-  cache.states.set(key, states);
-  return states;
-}
-
-export async function getCities(countryCode, stateCode = '') {
-  const country = String(countryCode || '').toUpperCase();
-  const state = String(stateCode || '');
-  const key = `${country}::${state}`;
-  if (cache.cities.has(key)) return cache.cities.get(key);
-  const query = new URLSearchParams({ country });
-  if (state) query.set('state', state);
-  const result = await request(`${API_BASE}/geo/cities?${query.toString()}`);
-  const cities = result.data || [];
-  cache.cities.set(key, cities);
-  return cities;
+export async function searchPlaces(query) {
+  const q = String(query || '').trim();
+  if (!q) return [];
+  const result = await request(`${API_BASE}/geo/search?q=${encodeURIComponent(q)}`);
+  return result.data || [];
 }
 
 export function guessCurrencyFromDestination(text, countries = []) {
