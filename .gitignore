@@ -164,5 +164,9 @@ build/
 # Debug
 *.local
 
+# Local PPT scratch / demos
+ppt/
+tmp-ppt/
+
 # Deployment guide (local only)
 DEPLOY.md
