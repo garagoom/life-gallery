@@ -52,6 +52,8 @@ export default defineConfig({
       'server/lib/fxCatalog.test.cjs',
       'server/lib/tripStatus.test.cjs',
       'server/lib/shopping.test.cjs',
+      'server/lib/glowScore.test.cjs',
+      'server/lib/glowPlaces.test.cjs',
     ],
     css: { modules: { classNameStrategy: 'non-scoped' } },
     pool: 'threads',

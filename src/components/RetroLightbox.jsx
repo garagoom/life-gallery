@@ -2,7 +2,7 @@ import { useEffect, useCallback, useState, useRef } from 'react';
 import { UserOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { getDisplayUrl, getThumbnailUrl } from '../data/photos';
 import { prefetchImage } from '../utils/imageCache';
-import { fitLightboxSize, lightboxMaxBox } from '../utils/lightboxSize';
+import { fitLightboxSize, lightboxMaxBox, LIGHTBOX_ROTATION_BUDGET_DEG } from '../utils/lightboxSize';
 import ExifInfo from './ExifInfo';
 import styles from './RetroLightbox.module.css';
 
@@ -12,8 +12,9 @@ const SWIPE_AXIS_RATIO = 1.15;
 
 function sizeFromPhoto(photo) {
   if (!photo) return null;
-  const { maxW, maxH } = lightboxMaxBox();
-  return fitLightboxSize(photo.width, photo.height, maxW, maxH);
+  const { maxW, maxH, framePad } = lightboxMaxBox();
+  const rot = Math.max(LIGHTBOX_ROTATION_BUDGET_DEG, Math.abs(Number(photo.rotation) || 0));
+  return fitLightboxSize(photo.width, photo.height, maxW, maxH, rot, framePad);
 }
 
 function navDirection(prevPhoto, nextPhoto, list) {
@@ -137,8 +138,9 @@ export default function RetroLightbox({ photo, photos, onClose, onNavigate }) {
 
     const applyDims = (dims) => {
       if (cancelled || !dims?.width || !dims?.height) return null;
-      const { maxW, maxH } = lightboxMaxBox();
-      const next = fitLightboxSize(dims.width, dims.height, maxW, maxH);
+      const { maxW, maxH, framePad } = lightboxMaxBox();
+      const rot = Math.max(LIGHTBOX_ROTATION_BUDGET_DEG, Math.abs(Number(photo.rotation) || 0));
+      const next = fitLightboxSize(dims.width, dims.height, maxW, maxH, rot, framePad);
       if (next) setSlotSize(next);
       return next;
     };

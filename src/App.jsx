@@ -27,6 +27,7 @@ const ShoppingList = lazy(() => import('./components/travel/ShoppingList'));
 const ShoppingDetail = lazy(() => import('./components/travel/ShoppingDetail'));
 const PhotoCalendar = lazy(() => import('./components/PhotoCalendar'));
 const PhotoCalendarDay = lazy(() => import('./components/PhotoCalendarDay'));
+const GlowForecast = lazy(() => import('./components/GlowForecast'));
 
 const hideMenuPaths = ['/login', '/register', '/loading'];
 
@@ -86,6 +87,13 @@ function AppRoutes({ handlePhotosLoaded, handlePhotoClick, isPaused, photos }) {
         <Route path="/photography/calendar/:date" element={
           <ProtectedRoute>
             <PhotoCalendarDay />
+          </ProtectedRoute>
+        } />
+        <Route path="/photography/glow" element={
+          <ProtectedRoute>
+            <div style={{ height: '100%', overflow: 'auto' }}>
+              <GlowForecast />
+            </div>
           </ProtectedRoute>
         } />
         <Route path="/photography/photo/:id" element={

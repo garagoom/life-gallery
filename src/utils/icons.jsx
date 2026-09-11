@@ -34,6 +34,7 @@ import {
   AccountBookOutlined,
   CompassOutlined,
   CalculatorOutlined,
+  CloudOutlined,
 } from '@ant-design/icons';
 
 export const iconList = [
@@ -71,6 +72,7 @@ export const iconList = [
   { label: '账本', value: 'AccountBookOutlined', icon: <AccountBookOutlined /> },
   { label: '指南针', value: 'CompassOutlined', icon: <CompassOutlined /> },
   { label: '计算器', value: 'CalculatorOutlined', icon: <CalculatorOutlined /> },
+  { label: '云', value: 'CloudOutlined', icon: <CloudOutlined /> },
 ];
 
 export const iconMap = {};

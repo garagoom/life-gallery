@@ -15,6 +15,7 @@ import {
   CalendarOutlined,
   AccountBookOutlined,
   CalculatorOutlined,
+  CloudOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -44,6 +45,7 @@ const fallbackModules = [
       { key: 'home', label: '首页', path: '/photography/home', icon: <HomeOutlined /> },
       { key: 'portfolio', label: '作品集', path: '/photography/portfolio', icon: <PictureOutlined /> },
       { key: 'calendar', label: '照片日历', path: '/photography/calendar', icon: <CalendarOutlined /> },
+      { key: 'glow', label: '火烧云', path: '/photography/glow', icon: <CloudOutlined /> },
       { key: 'admin', label: '管理', path: '/photography/admin', icon: <SettingOutlined /> },
     ]
   },
