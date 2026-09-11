@@ -26,10 +26,31 @@ export function markImageLoaded(url) {
 }
 
 export function prefetchImage(url) {
-  if (!url) return Promise.resolve();
-  if (loadedUrls.has(url)) return Promise.resolve();
+  if (!url) return Promise.resolve(null);
   const pending = inflight.get(url);
   if (pending) return pending;
+
+  const readDims = (img) => (
+    img.naturalWidth > 0
+      ? { width: img.naturalWidth, height: img.naturalHeight }
+      : null
+  );
+
+  if (loadedUrls.has(url)) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      let done = false;
+      const finish = (value) => {
+        if (done) return;
+        done = true;
+        resolve(value);
+      };
+      img.onload = () => finish(readDims(img));
+      img.onerror = () => finish(null);
+      img.src = url;
+      if (img.complete) finish(readDims(img));
+    });
+  }
 
   const promise = new Promise((resolve) => {
     const img = new Image();
@@ -37,11 +58,11 @@ export function prefetchImage(url) {
     img.onload = () => {
       loadedUrls.add(url);
       inflight.delete(url);
-      resolve();
+      resolve(readDims(img));
     };
     img.onerror = () => {
       inflight.delete(url);
-      resolve();
+      resolve(null);
     };
     img.src = url;
   });

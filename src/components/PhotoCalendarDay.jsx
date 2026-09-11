@@ -62,7 +62,7 @@ export default function PhotoCalendarDay() {
     return () => {
       cancelled = true;
     };
-  }, [dateParam, valid, location.state]);
+  }, [dateParam, valid]);
 
   const backToCalendar = () => {
     const from = location.state?.fromCalendar;
@@ -75,7 +75,19 @@ export default function PhotoCalendarDay() {
 
   const openPhoto = (photo) => {
     if (!photo) return;
-    navigate(`/photography/photo/${photo.id}`, { state: { background: location } });
+    // 弹层背景只保留路由信息，避免把整页 state 再嵌一层搞乱匹配
+    navigate(`/photography/photo/${photo.id}`, {
+      state: {
+        background: {
+          pathname: location.pathname,
+          search: location.search,
+          hash: location.hash,
+          state: {
+            fromCalendar: location.state?.fromCalendar,
+          },
+        },
+      },
+    });
   };
 
   const onCardClick = (index, photo) => {
@@ -143,6 +155,11 @@ export default function PhotoCalendarDay() {
               spaceBetween={18}
               speed={480}
               resistanceRatio={0.7}
+              threshold={6}
+              touchStartPreventDefault={false}
+              touchMoveStopPropagation
+              simulateTouch
+              allowTouchMove
               coverflowEffect={{
                 rotate: 0,
                 stretch: -28,
@@ -175,10 +192,17 @@ export default function PhotoCalendarDay() {
 
                 return (
                   <SwiperSlide key={photo.id} className={styles.slide}>
-                    <button
-                      type="button"
+                    <div
+                      role="button"
+                      tabIndex={0}
                       className={`${styles.switcherCard} ${index === activeIndex ? styles.switcherCardActive : ''}`}
                       onClick={() => onCardClick(index, photo)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          onCardClick(index, photo);
+                        }
+                      }}
                       aria-label={photo.title || `照片 ${index + 1}`}
                     >
                       <picture>
@@ -200,7 +224,7 @@ export default function PhotoCalendarDay() {
                           </span>
                         )}
                       </div>
-                    </button>
+                    </div>
                   </SwiperSlide>
                 );
               })}

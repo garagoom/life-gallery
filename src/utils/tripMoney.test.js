@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatMoney, roundMoney, foreignToBase, baseToForeign, applyFxToBudgetItem } from './tripMoney';
+import { formatMoney, roundMoney, foreignToBase, baseToForeign, applyFxToBudgetItem, applyFxToShoppingItem, sumSelectedShopping } from './tripMoney';
 
 describe('tripMoney', () => {
   it('formats yen without decimals and yuan with two', () => {
@@ -32,5 +32,29 @@ describe('tripMoney', () => {
 
     const pendingBase = { ...pendingTrip, quote_in: 'base' };
     expect(applyFxToBudgetItem(pendingBase, 0.05, 'JPY', 'CNY').amount).toBe(133840);
+  });
+
+  it('freezes bought shopping items when fx changes', () => {
+    const bought = { bought: true, quote_in: 'trip', amount: 8000, amount_cny: 344 };
+    expect(applyFxToShoppingItem(bought, 0.05, 'JPY', 'CNY').amount_cny).toBe(344);
+    expect(applyFxToShoppingItem({ ...bought, bought: false }, 0.05, 'JPY', 'CNY').amount_cny).toBe(400);
+  });
+
+  it('sums checked shopping rows in both currencies', () => {
+    const items = [
+      { _key: 'a', amount: 1980, amount_cny: 85.14 },
+      { _key: 'b', amount: 3200, amount_cny: 137.6 },
+      { _key: 'c', amount: 500, amount_cny: 21.5 },
+    ];
+    expect(sumSelectedShopping(items, new Set(['a', 'c']), 'JPY', 'CNY')).toEqual({
+      count: 2,
+      amount: 2480,
+      amountCny: 106.64,
+    });
+    expect(sumSelectedShopping(items, [], 'JPY', 'CNY')).toEqual({
+      count: 0,
+      amount: 0,
+      amountCny: 0,
+    });
   });
 });

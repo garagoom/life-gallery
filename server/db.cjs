@@ -276,14 +276,16 @@ async function initDb() {
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (11, 10, 'travel_trips', '出游计划', 'CalendarOutlined', '/travel/trips', 1)`);
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (12, 10, 'travel_budget', '预算总览', 'AccountBookOutlined', '/travel/budget', 2)`);
   db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (13, 10, 'travel_home', '旅程', 'CompassOutlined', '/travel/home', 3)`);
+  db.run(`INSERT OR IGNORE INTO menus (id, parent_id, key, label, icon, path, sort_order) VALUES (15, 10, 'travel_shopping', '购物清单', 'CalculatorOutlined', '/travel/shopping', 4)`);
+  db.run(`UPDATE menus SET label = '购物清单', icon = 'CalculatorOutlined', path = '/travel/shopping', sort_order = 4 WHERE key = 'travel_shopping'`);
 
   // Assign default permissions
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'admin'`);
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'photography_admin' AND m.id IN (1, 2, 3, 4, 9, 14)`);
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'system_admin' AND m.id IN (5, 6, 7, 8)`);
-  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'travel_admin' AND m.key IN ('travel', 'travel_trips', 'travel_budget', 'travel_home')`);
+  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'travel_admin' AND m.key IN ('travel', 'travel_trips', 'travel_budget', 'travel_home', 'travel_shopping')`);
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'reviewer' AND m.id IN (1, 9)`);
-  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'creator' AND m.key IN ('photography', 'home', 'portfolio', 'calendar', 'travel', 'travel_trips', 'travel_budget')`);
+  db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'creator' AND m.key IN ('photography', 'home', 'portfolio', 'calendar', 'travel', 'travel_trips', 'travel_budget', 'travel_shopping')`);
   db.run(`INSERT OR IGNORE INTO role_permissions (role_id, menu_id) SELECT r.id, m.id FROM roles r, menus m WHERE r.name = 'viewer' AND m.id IN (1, 2, 3, 14)`);
 
   // Create dictionaries table
@@ -348,7 +350,7 @@ async function initDb() {
   db.run(`UPDATE menus SET type = 'module' WHERE parent_id IS NULL AND type = 'menu'`);
   db.run(`UPDATE menus SET type = 'button' WHERE key IN ('admin', 'review') AND type = 'menu'`);
   db.run(`UPDATE menus SET type = 'menu' WHERE parent_id IS NOT NULL AND key NOT IN ('admin', 'review') AND type = 'menu'`);
-  db.run(`UPDATE menus SET has_data_scope = 1 WHERE key IN ('admin', 'review', 'users', 'roles', 'menus', 'travel_trips', 'travel_budget', 'calendar')`);
+  db.run(`UPDATE menus SET has_data_scope = 1 WHERE key IN ('admin', 'review', 'users', 'roles', 'menus', 'travel_trips', 'travel_budget', 'travel_shopping', 'calendar')`);
   db.run(`UPDATE menus SET has_data_scope = 0 WHERE key IN ('photography', 'home', 'portfolio', 'system', 'travel', 'travel_home')`);
   db.run(`UPDATE menus SET visible = 0 WHERE key = 'travel_home'`);
 
@@ -394,14 +396,14 @@ async function initDb() {
   ]);
   seedRoleDataPerms(db, 'travel_admin', [
     'trips.read.all', 'trips.write.all', 'budgets.read.all', 'budgets.write.all',
-    'travel_trips.all', 'travel_budget.all',
+    'travel_trips.all', 'travel_budget.all', 'travel_shopping.all',
   ]);
   seedRoleDataPerms(db, 'reviewer', ['photos.read.all', 'photos.review', 'review.all']);
   seedRoleDataPerms(db, 'creator', [
     'photos.read.own', 'photos.write.own',
     'calendar.own',
     'trips.read.own', 'trips.write.own', 'budgets.read.own', 'budgets.write.own',
-    'travel_trips.own', 'travel_budget.own',
+    'travel_trips.own', 'travel_budget.own', 'travel_shopping.own',
   ]);
 
   db.run(`UPDATE dictionaries SET status = 0 WHERE type = 'role' AND value = 'module_admin'`);
@@ -599,6 +601,44 @@ async function initDb() {
   addColumnIfMissing(db, 'budget_items', 'unit_amount_base', 'INTEGER');
   addColumnIfMissing(db, 'budget_expenses', 'amount_base', 'INTEGER');
   backfillBudgetBaseAmounts(db);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS shopping_lists (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trip_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      trip_currency TEXT DEFAULT 'CNY',
+      base_currency TEXT DEFAULT 'CNY',
+      fx_rate REAL DEFAULT 1,
+      fx_date TEXT,
+      note TEXT,
+      created_by TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS shopping_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      list_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      place TEXT,
+      quote_in TEXT DEFAULT 'trip',
+      amount INTEGER DEFAULT 0,
+      amount_base INTEGER DEFAULT 0,
+      budget_item_id INTEGER,
+      bought INTEGER DEFAULT 0,
+      applied_amount INTEGER DEFAULT 0,
+      applied_amount_base INTEGER DEFAULT 0,
+      note TEXT,
+      sort_order INTEGER DEFAULT 0,
+      FOREIGN KEY (list_id) REFERENCES shopping_lists(id) ON DELETE CASCADE,
+      FOREIGN KEY (budget_item_id) REFERENCES budget_items(id) ON DELETE SET NULL
+    )
+  `);
+  db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_lists_trip_id ON shopping_lists(trip_id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_shopping_items_list_id ON shopping_items(list_id)');
 
   migrateLegacyTripBudgets(db);
 

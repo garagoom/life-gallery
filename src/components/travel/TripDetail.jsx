@@ -3,11 +3,12 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Button, Form, Input, InputNumber, Select, Space, DatePicker, message, ConfigProvider, Modal,
 } from 'antd';
-import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, SaveOutlined, EditOutlined, EyeOutlined, AccountBookOutlined, ReloadOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, SaveOutlined, EditOutlined, EyeOutlined, AccountBookOutlined, ReloadOutlined, CalculatorOutlined } from '@ant-design/icons';
 import zhCN from 'antd/locale/zh_CN';
 import dayjs from 'dayjs';
 import { getTrip, updateTrip, saveTripDays } from '../../api/trips';
 import { createBudget } from '../../api/budgets';
+import { createShoppingList, getShoppingLists } from '../../api/shopping';
 import { getCountries, guessCurrencyFromDestination } from '../../api/geo';
 import { getFxRate } from '../../api/fx';
 import { useDict } from '../../contexts/DictContext';
@@ -16,6 +17,7 @@ import ListTable from '../ListTable';
 import TravelFileActions from './TravelFileActions';
 import DestinationCascader from './DestinationCascader';
 import CurrencySelect from './CurrencySelect';
+import TripTodayBanner from './TripTodayBanner';
 import styles from './travel.module.css';
 
 let rowSeed = 0;
@@ -66,6 +68,8 @@ export default function TripDetail() {
   const skipBudgetFx = useRef(true);
   const tripCurrency = Form.useWatch('trip_currency', budgetForm);
   const baseCurrency = Form.useWatch('base_currency', budgetForm);
+  const watchedStatus = Form.useWatch('status', form);
+  const tripStatus = watchedStatus || trip?.status;
 
   const refreshBudgetFx = async (from = tripCurrency, to = baseCurrency) => {
     const source = from || budgetForm.getFieldValue('trip_currency') || 'CNY';
@@ -231,6 +235,25 @@ export default function TripDetail() {
     }
   };
 
+  const openShopping = async () => {
+    if (!trip?.budget?.id) {
+      message.warning('请先创建预算，才能把已买商品加到预算项里');
+      return;
+    }
+    try {
+      const result = await getShoppingLists({ trip_id: id, pageSize: 1 });
+      const existing = result.data?.[0];
+      if (existing) {
+        navigate(`/travel/shopping/${existing.id}`);
+        return;
+      }
+      const created = await createShoppingList({ trip_id: Number(id) });
+      navigate(`/travel/shopping/${created.id}?mode=edit`);
+    } catch (error) {
+      message.error(error.message || '打开购物清单失败');
+    }
+  };
+
   const patchDay = (key, field, value) => {
     setDays((prev) => prev.map((day) => (day._key === key ? { ...day, [field]: value } : day)));
   };
@@ -320,6 +343,9 @@ export default function TripDetail() {
                 {mobile ? null : '创建预算'}
               </Button>
             )}
+            <Button icon={<CalculatorOutlined />} onClick={openShopping}>
+              {mobile ? null : '购物清单'}
+            </Button>
             {preview ? (
               <Button type="primary" icon={<EditOutlined />} onClick={() => setSearchParams({ mode: 'edit' })}>编辑</Button>
             ) : (
@@ -327,6 +353,10 @@ export default function TripDetail() {
             )}
           </Space>
         </div>
+
+        {tripStatus === 'ongoing' ? (
+          <TripTodayBanner days={days} startDate={trip?.start_date} />
+        ) : null}
 
         <div className={styles.scroll}>
           <div className={styles.section}>

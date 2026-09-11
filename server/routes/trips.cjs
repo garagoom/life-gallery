@@ -161,7 +161,7 @@ function loadAccessibleTrip(req, res) {
   return trip;
 }
 
-router.get('/', authMiddleware, requireAnyMenu('travel_trips', 'travel_budget'), (req, res) => {
+router.get('/', authMiddleware, requireAnyMenu('travel_trips', 'travel_budget', 'travel_shopping'), (req, res) => {
   try {
     const db = getDb();
     refreshTripStatuses(db);
@@ -252,7 +252,7 @@ router.post('/', authMiddleware, requireMenu('travel_trips'), (req, res) => {
   }
 });
 
-router.get('/:id', authMiddleware, requireAnyMenu('travel_trips', 'travel_budget'), (req, res) => {
+router.get('/:id', authMiddleware, requireAnyMenu('travel_trips', 'travel_budget', 'travel_shopping'), (req, res) => {
   try {
     const trip = loadAccessibleTrip(req, res);
     if (!trip) return;

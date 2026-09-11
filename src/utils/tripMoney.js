@@ -62,3 +62,30 @@ export function applyFxToBudgetItem(item, fxRate, tripCurrency, baseCurrency) {
     amount_cny: foreignToBase(item.amount, fxRate, baseCurrency),
   };
 }
+
+export function applyFxToShoppingItem(item, fxRate, tripCurrency, baseCurrency) {
+  return applyFxToBudgetItem(
+    { ...item, status: item.bought ? 'booked' : 'pending' },
+    fxRate,
+    tripCurrency,
+    baseCurrency,
+  );
+}
+
+export function sumSelectedShopping(items = [], selectedKeys, tripCurrency = 'CNY', baseCurrency = 'CNY') {
+  const keys = selectedKeys instanceof Set ? selectedKeys : new Set(selectedKeys || []);
+  let amount = 0;
+  let amountCny = 0;
+  let count = 0;
+  for (const item of items) {
+    if (!keys.has(item?._key)) continue;
+    count += 1;
+    amount += Number(item.amount) || 0;
+    amountCny += Number(item.amount_cny) || 0;
+  }
+  return {
+    count,
+    amount: roundMoney(amount, tripCurrency),
+    amountCny: roundMoney(amountCny, baseCurrency),
+  };
+}

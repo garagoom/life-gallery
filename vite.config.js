@@ -51,6 +51,7 @@ export default defineConfig({
       'server/lib/geoZh.test.cjs',
       'server/lib/fxCatalog.test.cjs',
       'server/lib/tripStatus.test.cjs',
+      'server/lib/shopping.test.cjs',
     ],
     css: { modules: { classNameStrategy: 'non-scoped' } },
     pool: 'threads',

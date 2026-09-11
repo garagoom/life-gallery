@@ -14,6 +14,7 @@ import {
   EnvironmentOutlined,
   CalendarOutlined,
   AccountBookOutlined,
+  CalculatorOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -28,6 +29,7 @@ import {
   readStoredPos,
   defaultPos,
 } from '../utils/floatingMenuPos';
+import { matchMenuChild, resolveMenuPageKey } from '../utils/menuActive';
 import styles from './FloatingMenu.module.css';
 
 const { Text } = Typography;
@@ -53,6 +55,7 @@ const fallbackModules = [
     children: [
       { key: 'travel_trips', label: '出游计划', path: '/travel/trips', icon: <CalendarOutlined /> },
       { key: 'travel_budget', label: '预算总览', path: '/travel/budget', icon: <AccountBookOutlined /> },
+      { key: 'travel_shopping', label: '购物清单', path: '/travel/shopping', icon: <CalculatorOutlined /> },
     ]
   },
 ];
@@ -232,15 +235,21 @@ export default function FloatingMenu() {
 
   const getCurrentModule = () => {
     const path = location.pathname;
-    // First: exact match on children paths (more specific)
-    for (const mod of modules) {
-      if (mod.children) {
-        for (const child of mod.children) {
-          if (child.path && path === child.path) return mod;
+    const backgroundPath = location.state?.background?.pathname;
+    // 先按子菜单最长前缀匹配（含 /calendar/:date、弹层背景页）
+    for (const candidatePath of [path, backgroundPath].filter(Boolean)) {
+      let best = null;
+      let bestMod = null;
+      for (const mod of modules) {
+        const hit = matchMenuChild(candidatePath, mod.children || []);
+        if (hit && (!best || hit.path.length > best.path.length)) {
+          best = hit;
+          bestMod = mod;
         }
       }
+      if (bestMod) return bestMod;
     }
-    // Second: match on module prefix (less specific)
+    // 再按模块 path 前缀
     for (const mod of modules) {
       if (mod.path && path.startsWith(mod.path)) return mod;
     }
@@ -249,16 +258,11 @@ export default function FloatingMenu() {
 
   const currentModule = getCurrentModule();
 
-  const getCurrentPage = () => {
-    const path = location.pathname;
-    if (!currentModule || !currentModule.children) return '';
-    for (const child of currentModule.children) {
-      if (child.path && path === child.path) return child.key;
-    }
-    return currentModule.children[0]?.key || '';
-  };
-
-  const currentPage = getCurrentPage();
+  const currentPage = resolveMenuPageKey(
+    location.pathname,
+    currentModule?.children || [],
+    location.state?.background?.pathname,
+  );
 
   const handleLogout = async () => {
     if (loggingOut) return;

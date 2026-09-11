@@ -119,6 +119,7 @@ export function inferAllScopeKeys(codes = []) {
   if (codes.includes('budgets.write.all') || codes.includes('budgets.read.all')) {
     all.add('travel_budget');
   }
+  if (codes.includes('travel_shopping.all')) all.add('travel_shopping');
   return [...all];
 }
 
@@ -178,6 +179,18 @@ export function composeDataPermissions({
       codes.add('budgets.read.all');
       codes.add('budgets.write.all');
     } else {
+      codes.add('budgets.read.own');
+      codes.add('budgets.write.own');
+    }
+  }
+
+  if (keys.has('travel_shopping') && withScope('travel_shopping')) {
+    if (all.has('travel_shopping')) {
+      codes.add('trips.read.all');
+      codes.add('budgets.read.all');
+      codes.add('budgets.write.all');
+    } else {
+      codes.add('trips.read.own');
       codes.add('budgets.read.own');
       codes.add('budgets.write.own');
     }

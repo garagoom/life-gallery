@@ -157,6 +157,94 @@
   gap: 8px;
 }
 
+.todayPlan {
+  flex-shrink: 0;
+  margin: -4px 0 16px;
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.todayPlanDays {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 0 12px;
+  padding-bottom: 2px;
+}
+
+.todayPlanChip {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 76px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.todayPlanChip strong {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.todayPlanChip span {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.todayPlanChipActive {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-primary));
+}
+
+.todayPlanChipToday span {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.todayPlanEyebrow {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.todayPlanTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.todayPlanMeta {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.todayPlanNotes {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .cardList {
   display: flex;
   flex-direction: column;
@@ -240,6 +328,18 @@
   gap: 8px;
 }
 
+.selectLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.selectLabel strong {
+  min-width: 0;
+  word-break: break-word;
+}
+
 .fieldGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -291,6 +391,15 @@
 
   .sub {
     font-size: 12px;
+  }
+
+  .todayPlan {
+    margin-bottom: 12px;
+    padding: 12px;
+  }
+
+  .todayPlanTitle {
+    font-size: 15px;
   }
 
   .searchBar {

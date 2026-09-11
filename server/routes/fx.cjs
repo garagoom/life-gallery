@@ -15,7 +15,7 @@ const limiter = rateLimit({
   keyFn: (req) => `fx:${req.user?.id || req.ip || 'anon'}`,
 });
 
-router.use(authMiddleware, requireAnyMenu('travel_trips', 'travel_budget'), limiter);
+router.use(authMiddleware, requireAnyMenu('travel_trips', 'travel_budget', 'travel_shopping'), limiter);
 
 async function fetchJson(url, timeoutMs = 8000) {
   const ac = new AbortController();

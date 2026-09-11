@@ -33,6 +33,7 @@ import {
   CalendarOutlined,
   AccountBookOutlined,
   CompassOutlined,
+  CalculatorOutlined,
 } from '@ant-design/icons';
 
 export const iconList = [
@@ -69,6 +70,7 @@ export const iconList = [
   { label: '日历', value: 'CalendarOutlined', icon: <CalendarOutlined /> },
   { label: '账本', value: 'AccountBookOutlined', icon: <AccountBookOutlined /> },
   { label: '指南针', value: 'CompassOutlined', icon: <CompassOutlined /> },
+  { label: '计算器', value: 'CalculatorOutlined', icon: <CalculatorOutlined /> },
 ];
 
 export const iconMap = {};

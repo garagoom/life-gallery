@@ -103,6 +103,18 @@ describe('dataPermissions', () => {
     });
     expect(all).toEqual(expect.arrayContaining(['travel_trips.all', 'trips.read.all', 'trips.write.all']));
     expect(all).not.toContain('budgets.read.all');
+
+    const shopping = composeDataPermissions({
+      menuKeys: ['travel_shopping'],
+      allScopeKeys: [],
+      scopedKeys: ['travel_shopping'],
+    });
+    expect(shopping).toEqual(expect.arrayContaining([
+      'travel_shopping.own',
+      'trips.read.own',
+      'budgets.read.own',
+      'budgets.write.own',
+    ]));
   });
 
   it('maps calendar menu to photo read own/all', () => {
@@ -132,6 +144,9 @@ describe('dataPermissions', () => {
     expect(inferAllScopeKeys(['trips.write.all'])).not.toContain('travel_budget');
     expect(inferAllScopeKeys(['budgets.write.all'])).toEqual(
       expect.arrayContaining(['travel_budget'])
+    );
+    expect(inferAllScopeKeys(['travel_shopping.all'])).toEqual(
+      expect.arrayContaining(['travel_shopping'])
     );
   });
 

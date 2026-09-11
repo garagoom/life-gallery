@@ -153,7 +153,7 @@ export default function PhotoCalendar() {
         <div className={styles.headerText}>
           <h1 className={styles.title}>{isCurrentMonth ? '今天' : cursor.format('M月')}</h1>
           <p className={styles.subtitle}>
-            {isCurrentMonth ? dayjs().format('YYYY年M月D日 ddd') : cursor.format('YYYY年M月')}
+            {isCurrentMonth ? dayjs().format('YYYY年M月D日 ddd') : cursor.format('YYYY年')}
           </p>
         </div>
         <button

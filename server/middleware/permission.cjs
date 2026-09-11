@@ -45,6 +45,8 @@ const MENU_SCOPE_ALIASES = {
   'travel_trips.own': ['trips.read.own', 'trips.write.own'],
   'travel_budget.all': ['budgets.read.all', 'budgets.write.all'],
   'travel_budget.own': ['budgets.read.own', 'budgets.write.own'],
+  'travel_shopping.all': ['trips.read.all', 'budgets.read.all', 'budgets.write.all'],
+  'travel_shopping.own': ['trips.read.own', 'budgets.read.own', 'budgets.write.own'],
 };
 
 function isAllowedDataCode(code) {

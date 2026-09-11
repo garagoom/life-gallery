@@ -23,6 +23,8 @@ const TripList = lazy(() => import('./components/travel/TripList'));
 const TripDetail = lazy(() => import('./components/travel/TripDetail'));
 const BudgetOverview = lazy(() => import('./components/travel/BudgetOverview'));
 const BudgetDetail = lazy(() => import('./components/travel/BudgetDetail'));
+const ShoppingList = lazy(() => import('./components/travel/ShoppingList'));
+const ShoppingDetail = lazy(() => import('./components/travel/ShoppingDetail'));
 const PhotoCalendar = lazy(() => import('./components/PhotoCalendar'));
 const PhotoCalendarDay = lazy(() => import('./components/PhotoCalendarDay'));
 
@@ -142,6 +144,16 @@ function AppRoutes({ handlePhotosLoaded, handlePhotoClick, isPaused, photos }) {
         <Route path="/travel/budget/:id" element={
           <ProtectedRoute>
             <BudgetDetail />
+          </ProtectedRoute>
+        } />
+        <Route path="/travel/shopping" element={
+          <ProtectedRoute>
+            <ShoppingList />
+          </ProtectedRoute>
+        } />
+        <Route path="/travel/shopping/:id" element={
+          <ProtectedRoute>
+            <ShoppingDetail />
           </ProtectedRoute>
         } />
         <Route path="/travel/home" element={<Navigate to="/travel/trips" replace />} />

@@ -110,6 +110,9 @@
   box-shadow: 0 10px 28px rgba(60, 42, 20, 0.12);
   cursor: pointer;
   transform: translateZ(0);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 :root[data-theme="dark"] .switcherCard {
